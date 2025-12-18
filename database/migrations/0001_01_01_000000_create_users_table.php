@@ -19,6 +19,7 @@ return new class extends Migration
             $table->text('address')->nullable();
             $table->string('city')->nullable();
             $table->string('postal_code')->nullable();
+            $table->string('profile_photo')->nullable();
             $table->enum('role', ['customer', 'admin'])->default('customer');
             $table->timestamp('email_verified_at')->nullable();
             $table->string('password');

@@ -4,8 +4,7 @@
         <div class="header-content">
             <div class="logo">
                 <a href="{{ route('home') }}" style="display: flex; align-items: center; text-decoration: none; gap: 12px;">
-                    <img src="{{ asset('assets/images/tmlogo.png') }}" alt="Tunas Motor" style="height: 60px; width: auto;" onerror="this.style.display='none'">
-                    <span style="font-weight: 700; color: #111; font-size: 24px; letter-spacing: -0.5px;">TUNAS MOTOR</span>
+                    <img src="{{ asset('assets/images/tmlogo2.png') }}" alt="Tunas Motor" style="height: 50px; width: auto;" onerror="this.style.display='none'">
                 </a>
             </div>
             
@@ -35,23 +34,69 @@
                     <span class="cart-count" id="cartCount">0</span>
                 </button>
                 
-                <button class="icon-btn user-btn" onclick="toggleUserMenu()">
-                    <i class="fa-regular fa-user" style="font-size: 20px;"></i>
-                </button>
-                
-                <div class="user-menu" id="userMenu">
-                    <div class="user-info">
-                        <p class="user-name">{{ Auth::user()->name }}</p>
-                        <p class="user-email">{{ Auth::user()->email }}</p>
+                <!-- User Profile Button with Photo -->
+                <div class="user-profile-wrapper">
+                    <button class="user-profile-btn" onclick="toggleUserMenu()" title="Profil Saya">
+                        @if(Auth::user()->hasProfilePhoto())
+                            <img src="{{ Auth::user()->profile_photo_url }}" alt="{{ Auth::user()->name }}" class="user-avatar-img">
+                        @else
+                            <div class="user-avatar-icon">
+                                <i class="fa-regular fa-user"></i>
+                            </div>
+                        @endif
+                    </button>
+                    
+                    <!-- Enhanced User Dropdown Menu -->
+                    <div class="user-dropdown-menu" id="userMenu">
+                        <div class="user-dropdown-header">
+                            <div class="user-dropdown-avatar">
+                                @if(Auth::user()->hasProfilePhoto())
+                                    <img src="{{ Auth::user()->profile_photo_url }}" alt="{{ Auth::user()->name }}">
+                                @else
+                                    <div class="avatar-placeholder">
+                                        <span>{{ Auth::user()->initials }}</span>
+                                    </div>
+                                @endif
+                            </div>
+                            <div class="user-dropdown-info">
+                                <p class="user-dropdown-name">{{ Auth::user()->name }}</p>
+                                <p class="user-dropdown-email">{{ Auth::user()->email }}</p>
+                            </div>
+                        </div>
+                        
+                        <div class="user-dropdown-divider"></div>
+                        
+                        <div class="user-dropdown-body">
+                            <a href="{{ route('profile.show') }}" class="user-dropdown-item">
+                                <i class="fa-regular fa-user"></i>
+                                <span>Lihat Profil</span>
+                            </a>
+                            <a href="{{ route('favorites.index') }}" class="user-dropdown-item">
+                                <i class="fa-regular fa-heart"></i>
+                                <span>Favorit Saya</span>
+                            </a>
+                            <a href="{{ route('cart.index') }}" class="user-dropdown-item">
+                                <i class="fa-solid fa-cart-shopping"></i>
+                                <span>Keranjang Saya</span>
+                            </a>
+                            <a href="{{ route('orders.index') }}" class="user-dropdown-item">
+                                <i class="fa-solid fa-box"></i>
+                                <span>Riwayat Pesanan</span>
+                            </a>
+                        </div>
+                        
+                        <div class="user-dropdown-divider"></div>
+                        
+                        <div class="user-dropdown-footer">
+                            <form method="POST" action="{{ route('logout') }}">
+                                @csrf
+                                <button type="submit" class="user-dropdown-logout">
+                                    <i class="fa-solid fa-right-from-bracket"></i>
+                                    <span>Keluar</span>
+                                </button>
+                            </form>
+                        </div>
                     </div>
-                    <a href="{{ route('profile.show') }}" class="user-menu-item">Lihat Profil</a>
-                    <a href="{{ route('favorites.index') }}" class="user-menu-item">Favorit Saya</a>
-                    <a href="{{ route('cart.index') }}" class="user-menu-item">Keranjang Saya</a>
-                    <a href="{{ route('orders.index') }}" class="user-menu-item">Riwayat Pesanan</a>
-                    <form method="POST" action="{{ route('logout') }}" class="user-menu-item">
-                        @csrf
-                        <button type="submit" class="logout-btn">Keluar</button>
-                    </form>
                 </div>
                 
                 <button class="btn-contact" onclick="toggleContactPopup()">Kontak</button>

@@ -111,4 +111,6 @@
     </div>
 </section>
 
+@include('layouts.partials.footer')
+
 @endsection

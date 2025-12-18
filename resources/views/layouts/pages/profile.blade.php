@@ -2,6 +2,11 @@
 
 @section('title', 'Profile - Tunas Motor')
 
+@push('styles')
+<!-- Cropper.js CSS -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.1/cropper.min.css">
+@endpush
+
 @section('content')
 @include('layouts.partials.header', ['hideSearch' => true])
 
@@ -10,13 +15,41 @@
     <div class="container">
         <div class="profile-container">
             <div class="profile-header">
-                <div class="profile-avatar">
-                    <svg width="80" height="80" viewBox="0 0 80 80" fill="none">
-                        <circle cx="40" cy="40" r="38" fill="#BC1D24" stroke="#fff" stroke-width="2"/>
-                        <path d="M55 60v-4a8 8 0 0 0-8-8H33a8 8 0 0 0-8 8v4" stroke="#fff" stroke-width="3" stroke-linecap="round"/>
-                        <circle cx="40" cy="32" r="8" stroke="#fff" stroke-width="3"/>
-                    </svg>
+                <div class="profile-avatar-container">
+                    <div class="profile-avatar-wrapper" id="profileAvatarWrapper">
+                        @if($user->hasProfilePhoto())
+                            <img src="{{ $user->profile_photo_url }}" alt="{{ $user->name }}" class="profile-avatar-img" id="profileAvatarImg">
+                        @else
+                            <div class="profile-avatar-placeholder" id="profileAvatarPlaceholder">
+                                <span>{{ $user->initials }}</span>
+                            </div>
+                        @endif
+                        
+                        <!-- Camera overlay for photo actions -->
+                        <div class="profile-avatar-overlay" onclick="togglePhotoMenu()">
+                            <i class="fa-solid fa-camera"></i>
+                        </div>
+                    </div>
+                    
+                    <!-- Photo Actions Menu -->
+                    <div class="photo-actions-menu" id="photoActionsMenu">
+                        <button type="button" class="photo-action-btn" onclick="selectProfilePhoto()">
+                            <i class="fa-solid fa-upload"></i>
+                            <span id="photoActionText">{{ $user->hasProfilePhoto() ? 'Ganti Foto' : 'Upload Foto' }}</span>
+                        </button>
+                        <button type="button" class="photo-action-btn photo-action-danger" id="removePhotoBtn" onclick="markPhotoForRemoval()" style="{{ $user->hasProfilePhoto() ? '' : 'display: none;' }}">
+                            <i class="fa-solid fa-trash"></i>
+                            <span>Hapus Foto</span>
+                        </button>
+                    </div>
+                    
+                    <!-- Photo change indicator -->
+                    <div class="photo-change-indicator" id="photoChangeIndicator" style="display: none;">
+                        <i class="fa-solid fa-info-circle"></i>
+                        <span id="photoChangeText">Foto akan diperbarui saat menyimpan</span>
+                    </div>
                 </div>
+                
                 <div class="profile-info">
                     <h1 class="profile-name">{{ $user->name }}</h1>
                     <p class="profile-email">{{ $user->email }}</p>
@@ -36,9 +69,14 @@
             <div class="profile-content">
                 <h2 class="section-title">Edit Profile</h2>
                 
-                <form method="POST" action="{{ route('profile.update') }}" class="profile-form">
+                <form method="POST" action="{{ route('profile.update') }}" class="profile-form" id="profileForm" enctype="multipart/form-data">
                     @csrf
                     @method('PUT')
+                    
+                    <!-- Hidden file input for photo (inside form) -->
+                    <input type="file" id="photoInput" name="profile_photo" accept="image/jpeg,image/png,image/jpg,image/gif,image/webp" style="display: none;" onchange="previewProfilePhoto(this)">
+                    <!-- Hidden input to mark photo for removal -->
+                    <input type="hidden" id="removePhotoInput" name="remove_photo" value="0">
 
                     <div class="form-section">
                         <h3 class="form-section-title">Informasi Pribadi</h3>
@@ -219,59 +257,6 @@
                         </div>
                     </div>
 
-                    <div class="form-section">
-                        <h3 class="form-section-title">Langganan Newsletter</h3>
-                        <p class="form-section-desc">Kelola langganan newsletter Anda</p>
-
-                        <div class="subscription-status">
-                            @php
-                                $subscriber = \App\Models\Subscriber::where('email', $user->email)->first();
-                                $isSubscribed = $subscriber && $subscriber->isSubscribed();
-                            @endphp
-
-                            @if($isSubscribed)
-                                <div class="subscription-active">
-                                    <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" class="text-success">
-                                        <path d="M16 6L7.5 14.5L4 11" stroke-linecap="round" stroke-linejoin="round"/>
-                                    </svg>
-                                    <span>Anda sedang berlangganan newsletter sejak {{ $subscriber->subscribed_at->format('d F Y') }}</span>
-                                </div>
-
-                                <form method="POST" action="{{ route('unsubscribe') }}" id="unsubscribe-form" style="margin-top: 15px;">
-                                    @csrf
-                                    <input type="hidden" name="email" value="{{ $user->email }}">
-                                    <button type="submit" class="btn-unsubscribe" style="background: #dc3545; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer;">
-                                        <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" style="margin-right: 8px;">
-                                            <path d="M2.5 1a1 1 0 0 0-1 1v1a1 1 0 0 0 1 1V1zM3 1v2h10V1H3z"/>
-                                            <path d="M13 3H3v9a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2V3z"/>
-                                        </svg>
-                                        Berhenti Berlangganan
-                                    </button>
-                                </form>
-                            @else
-                                <div class="subscription-inactive">
-                                    <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" class="text-muted">
-                                        <circle cx="10" cy="10" r="8"/>
-                                        <path d="M10 6v4M10 14v-4"/>
-                                    </svg>
-                                    <span>Anda belum berlangganan newsletter</span>
-                                </div>
-
-                                <form method="POST" action="{{ route('subscribe') }}" id="profile-subscribe-form" style="margin-top: 15px;">
-                                    @csrf
-                                    <input type="hidden" name="email" value="{{ $user->email }}">
-                                    <input type="hidden" name="name" value="{{ $user->name }}">
-                                    <button type="submit" class="btn-subscribe-profile" style="background: #28a745; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer;">
-                                        <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" style="margin-right: 8px;">
-                                            <path d="M15.854.146a.5.5 0 0 1 .11.54l-5.819 14.547a.75.75 0 0 1-1.329.124l-3.178-4.995L.643 7.184a.75.75 0 0 1 .124-1.33L15.314.037a.5.5 0 0 1 .54.11ZM6.636 10.07l2.761 4.338L14.13 2.576 6.636 10.07Zm6.787-8.201L1.591 6.602l4.339 2.76 7.494-7.493Z"/>
-                                        </svg>
-                                        Berlangganan Newsletter
-                                    </button>
-                                </form>
-                            @endif
-                        </div>
-                    </div>
-
                     <div class="form-actions">
                         <button type="submit" class="btn-submit">
                             <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2">
@@ -284,12 +269,123 @@
                         </a>
                     </div>
                 </form>
+
+                <!-- Newsletter Section - Separate from profile form -->
+                <div class="form-section newsletter-section">
+                    <h3 class="form-section-title">Langganan Newsletter</h3>
+                    <p class="form-section-desc">Kelola langganan newsletter Anda</p>
+
+                    <div class="subscription-status">
+                        @php
+                            $subscriber = \App\Models\Subscriber::where('email', $user->email)->first();
+                            $isSubscribed = $subscriber && $subscriber->isSubscribed();
+                        @endphp
+
+                        @if($isSubscribed)
+                            <div class="subscription-active">
+                                <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" class="text-success">
+                                    <path d="M16 6L7.5 14.5L4 11" stroke-linecap="round" stroke-linejoin="round"/>
+                                </svg>
+                                <span>Anda sedang berlangganan newsletter sejak {{ $subscriber->subscribed_at->format('d F Y') }}</span>
+                            </div>
+
+                            <form method="POST" action="{{ route('unsubscribe') }}" id="unsubscribe-form" class="newsletter-form">
+                                @csrf
+                                <input type="hidden" name="email" value="{{ $user->email }}">
+                                <button type="submit" class="btn-newsletter btn-unsubscribe">
+                                    <i class="fa-solid fa-bell-slash"></i>
+                                    Berhenti Berlangganan
+                                </button>
+                            </form>
+                        @else
+                            <div class="subscription-inactive">
+                                <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" class="text-muted">
+                                    <circle cx="10" cy="10" r="8"/>
+                                    <path d="M10 6v4M10 14v-4"/>
+                                </svg>
+                                <span>Anda belum berlangganan newsletter</span>
+                            </div>
+
+                            <a href="#contact" class="btn-newsletter btn-subscribe-profile">
+                                <i class="fa-solid fa-bell"></i>
+                                Berlangganan Newsletter
+                            </a>
+                        @endif
+                    </div>
+                </div>
             </div>
         </div>
     </div>
 </section>
 
 @include('layouts.partials.footer')
+
+<!-- Image Crop Modal -->
+<div class="crop-modal-overlay" id="cropModal">
+    <div class="crop-modal">
+        <div class="crop-modal-header">
+            <h3 class="crop-modal-title">
+                <i class="fa-solid fa-crop"></i>
+                Atur Foto Profil
+            </h3>
+            <button type="button" class="crop-modal-close" onclick="closeCropModal()">
+                <i class="fa-solid fa-times"></i>
+            </button>
+        </div>
+        <div class="crop-modal-body">
+            <div class="crop-container">
+                <img id="cropImage" src="" alt="Crop preview">
+            </div>
+            <div class="crop-instructions">
+                <i class="fa-solid fa-lightbulb"></i>
+                <span>Geser dan sesuaikan area yang ingin ditampilkan. Gunakan scroll mouse atau pinch untuk zoom. Hasil crop akan berbentuk lingkaran.</span>
+            </div>
+        </div>
+        <div class="crop-modal-footer">
+            <button type="button" class="crop-btn crop-btn-cancel" onclick="closeCropModal()">
+                <i class="fa-solid fa-times"></i>
+                Batal
+            </button>
+            <button type="button" class="crop-btn crop-btn-apply" onclick="applyCrop()">
+                <i class="fa-solid fa-check"></i>
+                Terapkan
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Cropper.js Library -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.1/cropper.min.js"></script>
+
+<!-- Initialize Profile Photo with user data -->
+<script>
+    // Initialize profile photo state with data from server
+    document.addEventListener('DOMContentLoaded', function() {
+        initializeProfilePhoto(
+            '{{ $user->profile_photo_url ?? "" }}',
+            {{ $user->hasProfilePhoto() ? 'true' : 'false' }},
+            '{{ $user->initials }}'
+        );
+
+        // Handle newsletter subscription button click
+        const newsletterBtn = document.querySelector('.btn-subscribe-profile');
+        if (newsletterBtn) {
+            newsletterBtn.addEventListener('click', function(e) {
+                e.preventDefault();
+                const targetElement = document.getElementById('contact');
+                if (targetElement) {
+                    targetElement.scrollIntoView({
+                        behavior: 'smooth',
+                        block: 'start'
+                    });
+                } else {
+                    // If footer is not on the same page, redirect to home page with anchor
+                    window.location.href = '{{ route("home") }}#contact';
+                }
+            });
+        }
+    });
+</script>
 
 @endsection
 

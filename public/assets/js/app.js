@@ -36,7 +36,7 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
     
-    // Add active class to nav links on scroll
+    // Add active class to nav links on scroll (only for anchor links)
     window.addEventListener('scroll', function() {
         const sections = document.querySelectorAll('section[id]');
         const scrollPosition = window.scrollY + 100;
@@ -47,7 +47,9 @@ document.addEventListener('DOMContentLoaded', function() {
             const sectionId = section.getAttribute('id');
             
             if (scrollPosition >= sectionTop && scrollPosition < sectionTop + sectionHeight) {
-                document.querySelectorAll('.nav-link').forEach(link => {
+                // Only update active class for anchor links (starting with #)
+                // Don't touch nav-links that are page links (like Beranda, Produk, Riwayat)
+                document.querySelectorAll('.nav-link[href^="#"]').forEach(link => {
                     link.classList.remove('active');
                     if (link.getAttribute('href') === '#' + sectionId) {
                         link.classList.add('active');
@@ -871,6 +873,19 @@ function switchTab(tab) {
     }
 }
 
+// Show welcome screen after preloader is hidden (for welcome page)
+document.addEventListener('preloader:hidden', function() {
+    const welcomeScreen = document.getElementById('welcome-screen');
+    if (welcomeScreen) {
+        welcomeScreen.style.display = 'block';
+        // Force reflow
+        welcomeScreen.offsetHeight;
+        setTimeout(function() {
+            welcomeScreen.style.opacity = '1';
+        }, 50);
+    }
+});
+
 // Initialize splash screen as soon as possible
 // Use both DOMContentLoaded and load events for reliability
 (function() {
@@ -912,10 +927,18 @@ function toggleUserMenu() {
 // Close menu when clicking outside
 document.addEventListener('click', function(event) {
     const menu = document.getElementById('userMenu');
-    const btn = document.querySelector('.user-btn');
-    
-    if (menu && btn && !menu.contains(event.target) && !btn.contains(event.target)) {
-        menu.classList.remove('show');
+    const btn = document.querySelector('.user-profile-btn');
+    const wrapper = document.querySelector('.user-profile-wrapper');
+
+    if (menu && menu.classList.contains('show')) {
+        // Check if click is outside the dropdown and the button
+        const isClickInsideMenu = menu.contains(event.target);
+        const isClickOnButton = btn && btn.contains(event.target);
+        const isClickInsideWrapper = wrapper && wrapper.contains(event.target);
+        
+        if (!isClickInsideMenu && !isClickOnButton) {
+            menu.classList.remove('show');
+        }
     }
 });
 
@@ -1158,9 +1181,14 @@ document.addEventListener('DOMContentLoaded', function() {
 function initScrollTop() {
     var scrollTop = document.querySelector(".scroll-top");
     if (scrollTop == null) {
-        console.log('Scroll top button not found');
         return;
     }
+    
+    // Prevent double initialization
+    if (scrollTop.classList.contains('initialized')) {
+        return;
+    }
+    scrollTop.classList.add('initialized');
     
     var scrollProgressPath = document.querySelector(".scroll-top .progress-circle path");
     var pathLength = 0;
@@ -1170,74 +1198,50 @@ function initScrollTop() {
     if (scrollProgressPath) {
         try {
             pathLength = scrollProgressPath.getTotalLength();
-            scrollProgressPath.style.transition = scrollProgressPath.style.WebkitTransition = "none";
-            scrollProgressPath.style.strokeDasharray = pathLength + " " + pathLength;
+            scrollProgressPath.style.strokeDasharray = pathLength + ' ' + pathLength;
             scrollProgressPath.style.strokeDashoffset = pathLength;
-            scrollProgressPath.getBoundingClientRect();
-            scrollProgressPath.style.transition = scrollProgressPath.style.WebkitTransition = "stroke-dashoffset 10ms linear";
         } catch(e) {
-            console.log('Progress circle path error:', e);
+            // SVG path methods may not be available in all browsers
         }
     }
     
     // Function to update scroll button visibility
     function updateScrollTop() {
         var scroll = window.pageYOffset || document.documentElement.scrollTop || document.body.scrollTop || 0;
-        var height = document.documentElement.scrollHeight - document.documentElement.clientHeight;
+        var height = document.documentElement.scrollHeight - window.innerHeight;
+        
+        // Show/hide button based on scroll position (using 'visible' class as per CSS)
+        if (scroll > offset) {
+            scrollTop.classList.add("visible");
+        } else {
+            scrollTop.classList.remove("visible");
+        }
         
         // Update progress circle
         if (scrollProgressPath && pathLength > 0 && height > 0) {
-            var progress = pathLength - (scroll * pathLength) / height;
+            var progress = pathLength - (scroll * pathLength / height);
             scrollProgressPath.style.strokeDashoffset = progress;
-        }
-        
-        // Show/hide button based on scroll position
-        if (scroll >= offset) {
-            scrollTop.classList.add("progress-done");
-        } else {
-            scrollTop.classList.remove("progress-done");
         }
     }
     
-    // Scroll event listener with throttle for performance
-    var ticking = false;
-    window.addEventListener("scroll", function () {
-        if (!ticking) {
-            window.requestAnimationFrame(function() {
-                updateScrollTop();
-                ticking = false;
-            });
-            ticking = true;
-        }
-    });
+    // Scroll event listener
+    window.addEventListener("scroll", updateScrollTop);
+    
+    // Initial check
+    updateScrollTop();
     
     // Click event listener
     scrollTop.addEventListener("click", function (e) {
         e.preventDefault();
-        window.scroll({
+        window.scrollTo({
             top: 0,
-            left: 0,
-            behavior: "smooth",
+            behavior: "smooth"
         });
     });
-    
-    // Initial check in case page is already scrolled
-    updateScrollTop();
-    
-    console.log('Scroll top button initialized');
 }
 
 // Initialize on DOM ready
 document.addEventListener('DOMContentLoaded', initScrollTop);
-
-// Also initialize on window load as fallback
-window.addEventListener('load', function() {
-    var scrollTop = document.querySelector(".scroll-top");
-    if (scrollTop && !scrollTop.classList.contains('initialized')) {
-        initScrollTop();
-        scrollTop.classList.add('initialized');
-    }
-});
 
 /* =====================================================
    CONTACT POPUP FUNCTIONS
@@ -1471,3 +1475,376 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 /*-- scroll top & contact popup scripts end --*/
+
+/* =====================================================
+   PROFILE PHOTO UPLOAD/CROP FUNCTIONS
+   ===================================================== */
+
+// Profile photo state variables (initialized by profile page)
+let profilePhotoState = {
+    originalPhotoUrl: '',
+    hasOriginalPhoto: false,
+    userInitials: '',
+    photoChanged: false,
+    photoMarkedForRemoval: false,
+    cropper: null,
+    currentFile: null
+};
+
+// Initialize profile photo functionality
+function initializeProfilePhoto(originalUrl, hasPhoto, initials) {
+    profilePhotoState.originalPhotoUrl = originalUrl || '';
+    profilePhotoState.hasOriginalPhoto = hasPhoto;
+    profilePhotoState.userInitials = initials || '';
+    profilePhotoState.photoChanged = false;
+    profilePhotoState.photoMarkedForRemoval = false;
+    profilePhotoState.cropper = null;
+    profilePhotoState.currentFile = null;
+}
+
+// Toggle photo actions menu
+function togglePhotoMenu() {
+    const menu = document.getElementById('photoActionsMenu');
+    if (menu) {
+        menu.classList.toggle('show');
+    }
+}
+
+// Close photo menu when clicking outside
+document.addEventListener('click', function(event) {
+    const menu = document.getElementById('photoActionsMenu');
+    const wrapper = document.getElementById('profileAvatarWrapper');
+    
+    if (menu && wrapper && !wrapper.contains(event.target) && !menu.contains(event.target)) {
+        menu.classList.remove('show');
+    }
+});
+
+// Trigger file input click
+function selectProfilePhoto() {
+    const photoInput = document.getElementById('photoInput');
+    if (photoInput) {
+        photoInput.click();
+    }
+    const menu = document.getElementById('photoActionsMenu');
+    if (menu) {
+        menu.classList.remove('show');
+    }
+}
+
+// Handle file selection - open crop modal
+function previewProfilePhoto(input) {
+    if (input.files && input.files[0]) {
+        const file = input.files[0];
+        
+        // Validate file size (max 10MB for original, will be compressed after crop)
+        if (file.size > 10 * 1024 * 1024) {
+            showPhotoToast('Ukuran gambar maksimal 10MB', 'error');
+            input.value = '';
+            return;
+        }
+        
+        // Validate file type
+        const validTypes = ['image/jpeg', 'image/png', 'image/jpg', 'image/gif', 'image/webp'];
+        if (!validTypes.includes(file.type)) {
+            showPhotoToast('Format gambar harus JPEG, PNG, JPG, GIF, atau WebP', 'error');
+            input.value = '';
+            return;
+        }
+        
+        profilePhotoState.currentFile = file;
+        
+        // Read file and open crop modal
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            openCropModal(e.target.result);
+        };
+        reader.readAsDataURL(file);
+    }
+}
+
+// Open crop modal
+function openCropModal(imageSrc) {
+    const modal = document.getElementById('cropModal');
+    const cropImage = document.getElementById('cropImage');
+    
+    if (!modal || !cropImage) return;
+    
+    // Set image source
+    cropImage.src = imageSrc;
+    
+    // Show modal
+    modal.classList.add('show');
+    document.body.style.overflow = 'hidden';
+    
+    // Initialize cropper after image loads
+    cropImage.onload = function() {
+        // Destroy existing cropper if any
+        if (profilePhotoState.cropper) {
+            profilePhotoState.cropper.destroy();
+        }
+        
+        // Initialize Cropper.js
+        if (typeof Cropper !== 'undefined') {
+            profilePhotoState.cropper = new Cropper(cropImage, {
+                aspectRatio: 1, // Square crop for profile photo
+                viewMode: 1,
+                dragMode: 'move',
+                autoCropArea: 0.8,
+                restore: false,
+                guides: true,
+                center: true,
+                highlight: false,
+                cropBoxMovable: true,
+                cropBoxResizable: true,
+                toggleDragModeOnDblclick: false,
+                minContainerWidth: 300,
+                minContainerHeight: 300,
+            });
+        }
+    };
+}
+
+// Close crop modal
+function closeCropModal() {
+    const modal = document.getElementById('cropModal');
+    if (modal) {
+        modal.classList.remove('show');
+    }
+    document.body.style.overflow = '';
+    
+    // Destroy cropper
+    if (profilePhotoState.cropper) {
+        profilePhotoState.cropper.destroy();
+        profilePhotoState.cropper = null;
+    }
+    
+    // Clear file input if cancelled
+    if (!profilePhotoState.photoChanged) {
+        const photoInput = document.getElementById('photoInput');
+        if (photoInput) {
+            photoInput.value = '';
+        }
+    }
+}
+
+// Apply crop and get cropped image
+function applyCrop() {
+    if (!profilePhotoState.cropper) return;
+    
+    // Get cropped canvas
+    const canvas = profilePhotoState.cropper.getCroppedCanvas({
+        width: 400,  // Output size
+        height: 400,
+        imageSmoothingEnabled: true,
+        imageSmoothingQuality: 'high',
+    });
+    
+    // Convert canvas to blob
+    canvas.toBlob(function(blob) {
+        // Create a new file from blob
+        const croppedFile = new File([blob], profilePhotoState.currentFile.name, {
+            type: 'image/jpeg',
+            lastModified: Date.now()
+        });
+        
+        // Create a DataTransfer to update file input
+        const dataTransfer = new DataTransfer();
+        dataTransfer.items.add(croppedFile);
+        const photoInput = document.getElementById('photoInput');
+        if (photoInput) {
+            photoInput.files = dataTransfer.files;
+        }
+        
+        // Get data URL for preview
+        const croppedDataUrl = canvas.toDataURL('image/jpeg', 0.9);
+        
+        // Update avatar display
+        updateAvatarDisplay(croppedDataUrl);
+        
+        // Mark as changed
+        profilePhotoState.photoChanged = true;
+        profilePhotoState.photoMarkedForRemoval = false;
+        const removePhotoInput = document.getElementById('removePhotoInput');
+        if (removePhotoInput) {
+            removePhotoInput.value = '0';
+        }
+        
+        // Show change indicator
+        showPhotoChangeIndicator('Foto baru akan disimpan saat klik "Simpan Perubahan"');
+        
+        // Show remove button
+        const removePhotoBtn = document.getElementById('removePhotoBtn');
+        const photoActionText = document.getElementById('photoActionText');
+        if (removePhotoBtn) removePhotoBtn.style.display = 'flex';
+        if (photoActionText) photoActionText.textContent = 'Ganti Foto';
+        
+        // Close modal
+        closeCropModal();
+        
+        showPhotoToast('Foto berhasil di-crop. Klik "Simpan Perubahan" untuk menyimpan.', 'success');
+    }, 'image/jpeg', 0.9);
+}
+
+// Mark photo for removal (will be removed on save)
+function markPhotoForRemoval() {
+    const menu = document.getElementById('photoActionsMenu');
+    if (menu) menu.classList.remove('show');
+    
+    // Clear file input
+    const photoInput = document.getElementById('photoInput');
+    if (photoInput) photoInput.value = '';
+    
+    // Mark for removal
+    profilePhotoState.photoMarkedForRemoval = true;
+    profilePhotoState.photoChanged = false;
+    const removePhotoInput = document.getElementById('removePhotoInput');
+    if (removePhotoInput) removePhotoInput.value = '1';
+    
+    // Show placeholder
+    showPlaceholder();
+    
+    // Update UI
+    const removePhotoBtn = document.getElementById('removePhotoBtn');
+    const photoActionText = document.getElementById('photoActionText');
+    if (removePhotoBtn) removePhotoBtn.style.display = 'none';
+    if (photoActionText) photoActionText.textContent = 'Upload Foto';
+    
+    // Show change indicator
+    showPhotoChangeIndicator('Foto akan dihapus saat klik "Simpan Perubahan"', true);
+    
+    showPhotoToast('Foto akan dihapus. Klik "Simpan Perubahan" untuk konfirmasi.', 'success');
+}
+
+// Show placeholder instead of photo
+function showPlaceholder() {
+    const wrapper = document.getElementById('profileAvatarWrapper');
+    const existingImg = document.getElementById('profileAvatarImg');
+    let placeholder = document.getElementById('profileAvatarPlaceholder');
+    
+    if (!wrapper) return;
+    
+    if (existingImg) {
+        existingImg.remove();
+    }
+    
+    if (!placeholder) {
+        placeholder = document.createElement('div');
+        placeholder.className = 'profile-avatar-placeholder';
+        placeholder.id = 'profileAvatarPlaceholder';
+        placeholder.innerHTML = `<span>${profilePhotoState.userInitials}</span>`;
+        wrapper.insertBefore(placeholder, wrapper.firstChild);
+    }
+}
+
+// Update avatar display with new image
+function updateAvatarDisplay(photoUrl) {
+    const wrapper = document.getElementById('profileAvatarWrapper');
+    let existingImg = document.getElementById('profileAvatarImg');
+    const placeholder = document.getElementById('profileAvatarPlaceholder');
+    
+    if (!wrapper) return;
+    
+    if (placeholder) {
+        placeholder.remove();
+    }
+    
+    if (existingImg) {
+        existingImg.src = photoUrl;
+    } else {
+        const img = document.createElement('img');
+        img.src = photoUrl;
+        img.alt = 'Profile Photo';
+        img.className = 'profile-avatar-img';
+        img.id = 'profileAvatarImg';
+        wrapper.insertBefore(img, wrapper.firstChild);
+    }
+}
+
+// Show photo change indicator
+function showPhotoChangeIndicator(message, isRemoval) {
+    isRemoval = isRemoval || false;
+    const indicator = document.getElementById('photoChangeIndicator');
+    const text = document.getElementById('photoChangeText');
+    
+    if (indicator && text) {
+        text.textContent = message;
+        indicator.style.display = 'flex';
+        indicator.className = 'photo-change-indicator' + (isRemoval ? ' photo-removal' : '');
+    }
+}
+
+// Hide photo change indicator
+function hidePhotoChangeIndicator() {
+    const indicator = document.getElementById('photoChangeIndicator');
+    if (indicator) {
+        indicator.style.display = 'none';
+    }
+}
+
+// Reset to original photo
+function resetPhoto() {
+    profilePhotoState.photoChanged = false;
+    profilePhotoState.photoMarkedForRemoval = false;
+    
+    const removePhotoInput = document.getElementById('removePhotoInput');
+    const photoInput = document.getElementById('photoInput');
+    const removePhotoBtn = document.getElementById('removePhotoBtn');
+    const photoActionText = document.getElementById('photoActionText');
+    
+    if (removePhotoInput) removePhotoInput.value = '0';
+    if (photoInput) photoInput.value = '';
+    
+    if (profilePhotoState.hasOriginalPhoto && profilePhotoState.originalPhotoUrl) {
+        updateAvatarDisplay(profilePhotoState.originalPhotoUrl);
+        if (removePhotoBtn) removePhotoBtn.style.display = 'flex';
+        if (photoActionText) photoActionText.textContent = 'Ganti Foto';
+    } else {
+        showPlaceholder();
+        if (removePhotoBtn) removePhotoBtn.style.display = 'none';
+        if (photoActionText) photoActionText.textContent = 'Upload Foto';
+    }
+    
+    hidePhotoChangeIndicator();
+}
+
+// Show toast notification for photo actions
+function showPhotoToast(message, type) {
+    // Remove existing toast if any
+    const existingToast = document.querySelector('.photo-toast');
+    if (existingToast) {
+        existingToast.remove();
+    }
+    
+    const toast = document.createElement('div');
+    toast.className = `photo-toast photo-toast-${type}`;
+    toast.innerHTML = `
+        <i class="fa-solid ${type === 'success' ? 'fa-check-circle' : 'fa-exclamation-circle'}"></i>
+        <span>${message}</span>
+    `;
+    document.body.appendChild(toast);
+    
+    // Trigger animation
+    setTimeout(() => toast.classList.add('show'), 10);
+    
+    // Remove after 3 seconds
+    setTimeout(() => {
+        toast.classList.remove('show');
+        setTimeout(() => toast.remove(), 300);
+    }, 3000);
+}
+
+// Close crop modal on escape key
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+        closeCropModal();
+    }
+});
+
+// Close crop modal on overlay click
+document.addEventListener('click', function(e) {
+    const modal = document.getElementById('cropModal');
+    if (modal && e.target === modal) {
+        closeCropModal();
+    }
+});

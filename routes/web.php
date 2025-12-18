@@ -11,7 +11,7 @@ use App\Http\Controllers\SubscriberController;
 use App\Http\Controllers\Admin\ReportController;
 use Illuminate\Support\Facades\Route;
 
-// Welcome page dengan splash screen
+// Welcome page dengan splash screen (accessible by all)
 Route::get('/', function () {
     return view('layouts.pages.welcome');
 })->name('welcome');
@@ -25,24 +25,27 @@ Route::get('/syarat-ketentuan', function () {
     return view('layouts.pages.terms');
 })->name('terms');
 
-// Auth routes
+// Auth routes (accessible by all - admin will be redirected to admin panel after login)
 Route::get('/login', [AuthController::class, 'showLogin'])->name('login');
 Route::post('/login', [AuthController::class, 'login']);
 Route::get('/register', [AuthController::class, 'showRegister'])->name('register');
 Route::post('/register', [AuthController::class, 'register']);
 Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
 
-// Home route (protected)
-Route::get('/home', [HomeController::class, 'index'])->name('home')->middleware('auth');
+// Customer-only routes (protected with auth + customer middleware)
+// Admin users will be redirected to admin panel if they try to access these
 
-// Products page (protected)
-Route::get('/products', [HomeController::class, 'products'])->name('products.index')->middleware('auth');
+// Home route (customer only)
+Route::get('/home', [HomeController::class, 'index'])->name('home')->middleware(['auth', 'customer']);
 
-// Products filter API (public)
+// Products page (customer only)
+Route::get('/products', [HomeController::class, 'products'])->name('products.index')->middleware(['auth', 'customer']);
+
+// Products filter API (public - for welcome page preview if needed)
 Route::get('/api/products/filter', [HomeController::class, 'filterProducts'])->name('products.filter');
 
-// Cart routes (protected)
-Route::middleware('auth')->group(function () {
+// Cart routes (customer only)
+Route::middleware(['auth', 'customer'])->group(function () {
     Route::get('/cart', [CartController::class, 'index'])->name('cart.index');
     Route::post('/cart/add', [CartController::class, 'add'])->name('cart.add')
         ->middleware(\App\Http\Middleware\EnsureJsonRequest::class);
@@ -54,8 +57,8 @@ Route::middleware('auth')->group(function () {
         ->middleware(\App\Http\Middleware\EnsureJsonRequest::class);
 });
 
-// Favorite routes (protected)
-Route::middleware('auth')->group(function () {
+// Favorite routes (customer only)
+Route::middleware(['auth', 'customer'])->group(function () {
     Route::get('/favorites', [FavoriteController::class, 'index'])->name('favorites.index');
     Route::post('/favorites/toggle', [FavoriteController::class, 'toggle'])->name('favorites.toggle')
         ->middleware(\App\Http\Middleware\EnsureJsonRequest::class);
@@ -67,14 +70,16 @@ Route::middleware('auth')->group(function () {
         ->middleware(\App\Http\Middleware\EnsureJsonRequest::class);
 });
 
-// Profile routes (protected)
-Route::middleware('auth')->group(function () {
+// Profile routes (customer only)
+Route::middleware(['auth', 'customer'])->group(function () {
     Route::get('/profile', [ProfileController::class, 'show'])->name('profile.show');
     Route::put('/profile', [ProfileController::class, 'update'])->name('profile.update');
+    Route::post('/profile/photo', [ProfileController::class, 'uploadPhoto'])->name('profile.photo.upload');
+    Route::delete('/profile/photo', [ProfileController::class, 'removePhoto'])->name('profile.photo.remove');
 });
 
-// Checkout routes (protected)
-Route::middleware('auth')->group(function () {
+// Checkout routes (customer only)
+Route::middleware(['auth', 'customer'])->group(function () {
     Route::get('/checkout', [CheckoutController::class, 'index'])->name('checkout.index');
     Route::post('/checkout', [CheckoutController::class, 'process'])->name('checkout.process');
     Route::get('/checkout/payment/{order}', [CheckoutController::class, 'payment'])->name('checkout.payment');
@@ -84,8 +89,8 @@ Route::middleware('auth')->group(function () {
 // Midtrans webhook callback (no auth required)
 Route::post('/midtrans/callback', [CheckoutController::class, 'callback'])->name('midtrans.callback');
 
-// Order routes (protected)
-Route::middleware('auth')->group(function () {
+// Order routes (customer only)
+Route::middleware(['auth', 'customer'])->group(function () {
     Route::get('/orders', [OrderController::class, 'index'])->name('orders.index');
     Route::get('/orders/{order}', [OrderController::class, 'show'])->name('orders.show');
     Route::post('/orders/{order}/cancel', [OrderController::class, 'cancel'])->name('orders.cancel');
@@ -101,7 +106,7 @@ Route::post('/unsubscribe', [SubscriberController::class, 'unsubscribe'])->name(
 Route::get('/check-subscription', [SubscriberController::class, 'checkSubscription'])->name('check.subscription');
 
 // Admin Report Export routes (protected - admin only)
-Route::middleware('auth')->prefix('admin')->name('admin.')->group(function () {
+Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(function () {
     // PDF Exports
     Route::get('/orders/export-pdf', [ReportController::class, 'exportOrdersPdf'])->name('orders.export-pdf');
     Route::get('/products/export-pdf', [ReportController::class, 'exportProductsPdf'])->name('products.export-pdf');

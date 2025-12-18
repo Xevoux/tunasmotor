@@ -10,49 +10,4 @@
         </svg>
     </span>
 </button>
-
-<script>
-// Inline scroll-top script untuk memastikan berjalan
-(function() {
-    document.addEventListener('DOMContentLoaded', function() {
-        var btn = document.getElementById('scrollTopBtn');
-        if (!btn) return;
-        
-        var progressPath = btn.querySelector('.progress-circle path');
-        var pathLength = 0;
-        
-        if (progressPath) {
-            try {
-                pathLength = progressPath.getTotalLength();
-                progressPath.style.strokeDasharray = pathLength + ' ' + pathLength;
-                progressPath.style.strokeDashoffset = pathLength;
-            } catch(e) {}
-        }
-        
-        function updateButton() {
-            var scrollTop = window.pageYOffset || document.documentElement.scrollTop;
-            var docHeight = document.documentElement.scrollHeight - window.innerHeight;
-            
-            if (scrollTop > 200) {
-                btn.classList.add('visible');
-            } else {
-                btn.classList.remove('visible');
-            }
-            
-            if (progressPath && pathLength > 0 && docHeight > 0) {
-                var progress = pathLength - (scrollTop * pathLength / docHeight);
-                progressPath.style.strokeDashoffset = progress;
-            }
-        }
-        
-        window.addEventListener('scroll', updateButton);
-        updateButton();
-        
-        btn.addEventListener('click', function(e) {
-            e.preventDefault();
-            window.scrollTo({ top: 0, behavior: 'smooth' });
-        });
-    });
-})();
-</script>
 <!--========== End scrollTop ==============-->

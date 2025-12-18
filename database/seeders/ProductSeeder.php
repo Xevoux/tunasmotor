@@ -39,18 +39,6 @@ class ProductSeeder extends Seeder
                 'is_new' => true,
                 'diskon_persen' => null,
             ],
-            [
-                'category_id' => 1,
-                'nama' => 'Mobil 1 Advanced Fuel Economy Full Synthetic Motor Oil 0W-20',
-                'deskripsi' => 'Oli motor hemat bahan bakar dengan teknologi advanced',
-                'harga' => 396000,
-                'harga_diskon' => null,
-                'stok' => 38,
-                'terjual' => 29,
-                'gambar' => null,
-                'is_new' => false,
-                'diskon_persen' => null,
-            ],
             
             // Lampu
             [
@@ -64,18 +52,6 @@ class ProductSeeder extends Seeder
                 'gambar' => null,
                 'is_new' => true,
                 'diskon_persen' => 15,
-            ],
-            [
-                'category_id' => 2,
-                'nama' => 'TYPE S - Remote-Controlled 194, T10 Multicolor LED Mini Bulb',
-                'deskripsi' => 'Lampu LED multicolor dengan remote control',
-                'harga' => 250000,
-                'harga_diskon' => null,
-                'stok' => 50,
-                'terjual' => 35,
-                'gambar' => null,
-                'is_new' => true,
-                'diskon_persen' => null,
             ],
             
             // Suspensi
@@ -158,30 +134,6 @@ class ProductSeeder extends Seeder
                 'gambar' => null,
                 'is_new' => false,
                 'diskon_persen' => 20,
-            ],
-            [
-                'category_id' => 5,
-                'nama' => 'Touren TR-3190-1806 5X112_5X120_42H 72Cb',
-                'deskripsi' => 'Velg stylish untuk tampilan motor yang sporty',
-                'harga' => 2543000,
-                'harga_diskon' => null,
-                'stok' => 14,
-                'terjual' => 20,
-                'gambar' => null,
-                'is_new' => false,
-                'diskon_persen' => 15,
-            ],
-            [
-                'category_id' => 5,
-                'nama' => 'RTX Spur 14-C5-14 60 DD KIT FF5B',
-                'deskripsi' => 'Velg kit lengkap dengan aksesori',
-                'harga' => 2444000,
-                'harga_diskon' => null,
-                'stok' => 34,
-                'terjual' => 30,
-                'gambar' => null,
-                'is_new' => false,
-                'diskon_persen' => 30,
             ],
         ];
 

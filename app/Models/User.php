@@ -33,6 +33,7 @@ class User extends Authenticatable implements FilamentUser
         'address',
         'city',
         'postal_code',
+        'profile_photo',
         'role',
     ];
 
@@ -144,5 +145,38 @@ class User extends Authenticatable implements FilamentUser
     public function hasFavorited(Product $product): bool
     {
         return $this->favorites()->where('product_id', $product->id)->exists();
+    }
+
+    /**
+     * Get profile photo URL
+     */
+    public function getProfilePhotoUrlAttribute(): ?string
+    {
+        if ($this->profile_photo) {
+            return asset('storage/profile-photos/' . $this->profile_photo);
+        }
+        return null;
+    }
+
+    /**
+     * Check if user has profile photo
+     */
+    public function hasProfilePhoto(): bool
+    {
+        return !empty($this->profile_photo);
+    }
+
+    /**
+     * Get user initials for avatar fallback
+     */
+    public function getInitialsAttribute(): string
+    {
+        $names = explode(' ', $this->name);
+        $initials = '';
+        foreach ($names as $name) {
+            $initials .= strtoupper(substr($name, 0, 1));
+            if (strlen($initials) >= 2) break;
+        }
+        return $initials ?: 'U';
     }
 }

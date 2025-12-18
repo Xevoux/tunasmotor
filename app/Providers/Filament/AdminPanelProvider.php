@@ -28,6 +28,7 @@ class AdminPanelProvider extends PanelProvider
             ->id('admin')
             ->path('admin')
             // Login page disabled - use main app login instead
+            ->login(false)
             ->brandName('Tunas Motor Admin')
             ->colors([
                 'primary' => Color::Blue,

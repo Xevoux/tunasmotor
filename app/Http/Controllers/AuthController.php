@@ -11,8 +11,20 @@ class AuthController extends Controller
 {
     public function showLogin()
     {
-        // Allow access to login page even if logged in (for switching accounts)
-        // The login() method will handle logging out existing user
+        // If user is already logged in, redirect based on role
+        if (Auth::check()) {
+            /** @var User $user */
+            $user = Auth::user();
+            
+            // Admin should go to admin panel
+            if ($user->isAdmin()) {
+                return redirect('/admin');
+            }
+            
+            // Customer should go to home
+            return redirect()->route('home');
+        }
+        
         return view('auth.login');
     }
 
@@ -49,9 +61,9 @@ class AuthController extends Controller
                 return redirect('/admin');
             }
             
-            // Clear any intended URL that might point to API endpoints
+            // Clear any intended URL that might point to API endpoints or admin routes
             $intended = redirect()->intended()->getTargetUrl();
-            if (str_contains($intended, '/favorites/list') || str_contains($intended, '/api/')) {
+            if (str_contains($intended, '/favorites/list') || str_contains($intended, '/api/') || str_contains($intended, '/admin')) {
                 return redirect()->route('home');
             }
             
@@ -105,6 +117,7 @@ class AuthController extends Controller
         $request->session()->invalidate();
         $request->session()->regenerateToken();
 
-        return redirect()->route('login');
+        // Always redirect to welcome page after logout
+        return redirect()->route('welcome');
     }
 }

@@ -7,24 +7,11 @@
         <link rel="preconnect" href="https://fonts.bunny.net">
         <link href="https://fonts.bunny.net/css?family=poppins:400,500,600,700" rel="stylesheet" />
         <link href="{{ asset('assets/css/style.css') }}" rel="stylesheet" />
+        <link href="{{ asset('assets/css/preloader.css') }}" rel="stylesheet" />
     </head>
     <body>
-        <!-- Splash Screen -->
-        <div id="splash-screen" class="splash-screen">
-            <div class="splash-content">
-                <div class="splash-logo">
-                    <svg width="100" height="100" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
-                        <circle cx="50" cy="50" r="45" stroke="#BC1D24" stroke-width="3" stroke-dasharray="283" stroke-dashoffset="0" class="circle-animation"/>
-                        <path d="M50 25 L60 45 L80 45 L65 57 L70 75 L50 65 L30 75 L35 57 L20 45 L40 45 Z" fill="#BC1D24" class="star-animation"/>
-                    </svg>
-                </div>
-                <h1 class="splash-title">Tunas Motor</h1>
-                <p class="splash-subtitle">Sparepart Motor Terpercaya</p>
-                <div class="splash-loader">
-                    <div class="loader-bar"></div>
-                </div>
-            </div>
-        </div>
+        {{-- Include Preloader Component --}}
+        @include('layouts.utilities.preloader')
 
         <!-- Welcome Screen -->
         <div id="welcome-screen" class="welcome-screen">
@@ -160,33 +147,7 @@
             </div>
         </div>
 
+        <script src="{{ asset('assets/js/preloader.js') }}"></script>
         <script src="{{ asset('assets/js/app.js') }}"></script>
-        
-        <!-- Fallback splash screen script in case app.js fails -->
-        <script>
-            (function() {
-                // Ensure splash screen transitions even if main app.js has issues
-                var splashScreen = document.getElementById('splash-screen');
-                var welcomeScreen = document.getElementById('welcome-screen');
-                
-                if (splashScreen && welcomeScreen) {
-                    // Set a maximum timeout to ensure splash always transitions
-                    setTimeout(function() {
-                        if (splashScreen.style.display !== 'none') {
-                            splashScreen.style.opacity = '0';
-                            setTimeout(function() {
-                                splashScreen.style.display = 'none';
-                                welcomeScreen.style.display = 'block';
-                                // Force reflow
-                                welcomeScreen.offsetHeight;
-                                setTimeout(function() {
-                                    welcomeScreen.style.opacity = '1';
-                                }, 50);
-                            }, 500);
-                        }
-                    }, 3000); // 3 seconds fallback
-                }
-            })();
-        </script>
     </body>
 </html>

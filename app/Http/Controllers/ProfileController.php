@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 
 class ProfileController extends Controller
@@ -41,6 +42,8 @@ class ProfileController extends Controller
             'postal_code' => 'nullable|string|max:10',
             'current_password' => 'nullable|required_with:new_password',
             'new_password' => 'nullable|min:8|confirmed',
+            'profile_photo' => 'nullable|image|mimes:jpeg,png,jpg,gif,webp|max:2048',
+            'remove_photo' => 'nullable|in:0,1',
         ], [
             'name.required' => 'Nama harus diisi',
             'email.required' => 'Email harus diisi',
@@ -49,6 +52,9 @@ class ProfileController extends Controller
             'current_password.required_with' => 'Password lama harus diisi jika ingin mengganti password',
             'new_password.min' => 'Password baru minimal 8 karakter',
             'new_password.confirmed' => 'Konfirmasi password tidak cocok',
+            'profile_photo.image' => 'File harus berupa gambar',
+            'profile_photo.mimes' => 'Format gambar harus jpeg, png, jpg, gif, atau webp',
+            'profile_photo.max' => 'Ukuran gambar maksimal 2MB',
         ]);
 
         // Cek jika user ingin mengganti password
@@ -64,6 +70,27 @@ class ProfileController extends Controller
             $user->password = Hash::make($request->new_password);
         }
 
+        // Handle photo removal
+        if ($request->input('remove_photo') === '1') {
+            if ($user->profile_photo) {
+                Storage::disk('public')->delete('profile-photos/' . $user->profile_photo);
+                $user->profile_photo = null;
+            }
+        }
+        // Handle photo upload (only if not marked for removal)
+        elseif ($request->hasFile('profile_photo')) {
+            // Hapus foto lama jika ada
+            if ($user->profile_photo) {
+                Storage::disk('public')->delete('profile-photos/' . $user->profile_photo);
+            }
+
+            // Upload foto baru
+            $file = $request->file('profile_photo');
+            $filename = 'profile_' . $user->id . '_' . time() . '.' . $file->getClientOriginalExtension();
+            $file->storeAs('profile-photos', $filename, 'public');
+            $user->profile_photo = $filename;
+        }
+
         // Update profile fields
         $user->name = $validated['name'];
         $user->email = $validated['email'];
@@ -75,6 +102,75 @@ class ProfileController extends Controller
 
         return redirect()->route('profile.show')
             ->with('success', 'Profile berhasil diperbarui!');
+    }
+
+    /**
+     * Upload atau update foto profil
+     */
+    public function uploadPhoto(Request $request)
+    {
+        $request->validate([
+            'profile_photo' => 'required|image|mimes:jpeg,png,jpg,gif,webp|max:2048',
+        ], [
+            'profile_photo.required' => 'Silakan pilih foto untuk diupload',
+            'profile_photo.image' => 'File harus berupa gambar',
+            'profile_photo.mimes' => 'Format gambar harus jpeg, png, jpg, gif, atau webp',
+            'profile_photo.max' => 'Ukuran gambar maksimal 2MB',
+        ]);
+
+        $user = Auth::user();
+
+        // Hapus foto lama jika ada
+        if ($user->profile_photo) {
+            Storage::disk('public')->delete('profile-photos/' . $user->profile_photo);
+        }
+
+        // Upload foto baru
+        $file = $request->file('profile_photo');
+        $filename = 'profile_' . $user->id . '_' . time() . '.' . $file->getClientOriginalExtension();
+        $file->storeAs('profile-photos', $filename, 'public');
+
+        // Update database
+        $user->profile_photo = $filename;
+        $user->save();
+
+        if ($request->ajax() || $request->wantsJson()) {
+            return response()->json([
+                'success' => true,
+                'message' => 'Foto profil berhasil diupload!',
+                'photo_url' => $user->profile_photo_url,
+            ]);
+        }
+
+        return redirect()->route('profile.show')
+            ->with('success', 'Foto profil berhasil diupload!');
+    }
+
+    /**
+     * Hapus foto profil
+     */
+    public function removePhoto(Request $request)
+    {
+        $user = Auth::user();
+
+        if ($user->profile_photo) {
+            // Hapus file dari storage
+            Storage::disk('public')->delete('profile-photos/' . $user->profile_photo);
+            
+            // Update database
+            $user->profile_photo = null;
+            $user->save();
+        }
+
+        if ($request->ajax() || $request->wantsJson()) {
+            return response()->json([
+                'success' => true,
+                'message' => 'Foto profil berhasil dihapus!',
+            ]);
+        }
+
+        return redirect()->route('profile.show')
+            ->with('success', 'Foto profil berhasil dihapus!');
     }
 }
 

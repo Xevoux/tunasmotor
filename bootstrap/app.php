@@ -1,5 +1,7 @@
 <?php
 
+use App\Http\Middleware\EnsureAdminRole;
+use App\Http\Middleware\EnsureCustomerRole;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -15,6 +17,12 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->validateCsrfTokens(except: [
             'payment/callback',
             'midtrans/callback', // Webhook from Midtrans
+        ]);
+
+        // Register middleware aliases
+        $middleware->alias([
+            'customer' => EnsureCustomerRole::class,
+            'admin' => EnsureAdminRole::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

@@ -23,6 +23,9 @@
         <!-- Footer Columns -->
         <div class="footer-columns">
             <div class="footer-column">
+                <div class="footer-logo" style="margin-bottom: 20px;">
+                    <img src="{{ asset('assets/images/tmlogo3.png') }}" alt="Tunas Motor Logo" style="max-width: 120px; height: auto;">
+                </div>
                 <h4>Hubungi Kami</h4>
                 @if($footer && $footer->phone_number)
                     <p><strong>Nomor Telepon</strong><br>{{ $footer->phone_number }}</p>
@@ -52,7 +55,7 @@
                         <iframe
                             src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3960.902!2d108.552!3d-6.717!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x0%3A0x0!2zNsKwNDMnMDEuMiJTIDEwOMKwMzMnMDcuMiJF!5e0!3m2!1sen!2sid!4v1700000000000!5m2!1sen!2sid"
                             width="100%"
-                            height="250"
+                            height="350"
                             style="border:0;"
                             allowfullscreen=""
                             loading="lazy"
