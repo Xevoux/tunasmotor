@@ -24,10 +24,8 @@ class ProductSeeder extends Seeder
                 'stok' => 24,
                 'terjual' => 38,
                 'gambar' => null,
-                'rating' => 4.33,
-                'jumlah_rating' => 15,
                 'is_new' => true,
-                'diskon_persen' => null,
+                'diskon_persen' => 10,
             ],
             [
                 'category_id' => 1,
@@ -38,8 +36,6 @@ class ProductSeeder extends Seeder
                 'stok' => 30,
                 'terjual' => 50,
                 'gambar' => null,
-                'rating' => 4.67,
-                'jumlah_rating' => 24,
                 'is_new' => true,
                 'diskon_persen' => null,
             ],
@@ -52,8 +48,6 @@ class ProductSeeder extends Seeder
                 'stok' => 38,
                 'terjual' => 29,
                 'gambar' => null,
-                'rating' => 4.33,
-                'jumlah_rating' => 18,
                 'is_new' => false,
                 'diskon_persen' => null,
             ],
@@ -68,10 +62,8 @@ class ProductSeeder extends Seeder
                 'stok' => 15,
                 'terjual' => 8,
                 'gambar' => null,
-                'rating' => 4.5,
-                'jumlah_rating' => 10,
                 'is_new' => true,
-                'diskon_persen' => null,
+                'diskon_persen' => 15,
             ],
             [
                 'category_id' => 2,
@@ -82,8 +74,6 @@ class ProductSeeder extends Seeder
                 'stok' => 50,
                 'terjual' => 35,
                 'gambar' => null,
-                'rating' => 4.2,
-                'jumlah_rating' => 22,
                 'is_new' => true,
                 'diskon_persen' => null,
             ],
@@ -98,10 +88,8 @@ class ProductSeeder extends Seeder
                 'stok' => 8,
                 'terjual' => 4,
                 'gambar' => null,
-                'rating' => 4.8,
-                'jumlah_rating' => 6,
                 'is_new' => true,
-                'diskon_persen' => null,
+                'diskon_persen' => 25,
             ],
             
             // Coolant
@@ -114,10 +102,8 @@ class ProductSeeder extends Seeder
                 'stok' => 45,
                 'terjual' => 67,
                 'gambar' => null,
-                'rating' => 4.5,
-                'jumlah_rating' => 32,
                 'is_new' => true,
-                'diskon_persen' => null,
+                'diskon_persen' => 5,
             ],
             
             // Filter
@@ -130,8 +116,6 @@ class ProductSeeder extends Seeder
                 'stok' => 35,
                 'terjual' => 28,
                 'gambar' => null,
-                'rating' => 4.33,
-                'jumlah_rating' => 19,
                 'is_new' => false,
                 'diskon_persen' => null,
             ],
@@ -146,8 +130,6 @@ class ProductSeeder extends Seeder
                 'stok' => 10,
                 'terjual' => 20,
                 'gambar' => null,
-                'rating' => 4.33,
-                'jumlah_rating' => 27,
                 'is_new' => false,
                 'diskon_persen' => 20,
             ],
@@ -160,8 +142,6 @@ class ProductSeeder extends Seeder
                 'stok' => 50,
                 'terjual' => 17,
                 'gambar' => null,
-                'rating' => 4.67,
-                'jumlah_rating' => 30,
                 'is_new' => false,
                 'diskon_persen' => 25,
             ],
@@ -176,8 +156,6 @@ class ProductSeeder extends Seeder
                 'stok' => 8,
                 'terjual' => 5,
                 'gambar' => null,
-                'rating' => 3.67,
-                'jumlah_rating' => 14,
                 'is_new' => false,
                 'diskon_persen' => 20,
             ],
@@ -190,8 +168,6 @@ class ProductSeeder extends Seeder
                 'stok' => 14,
                 'terjual' => 20,
                 'gambar' => null,
-                'rating' => 3.33,
-                'jumlah_rating' => 18,
                 'is_new' => false,
                 'diskon_persen' => 15,
             ],
@@ -204,14 +180,16 @@ class ProductSeeder extends Seeder
                 'stok' => 34,
                 'terjual' => 30,
                 'gambar' => null,
-                'rating' => 3.67,
-                'jumlah_rating' => 25,
                 'is_new' => false,
                 'diskon_persen' => 30,
             ],
         ];
 
         foreach ($products as $product) {
+            // Calculate harga_diskon if diskon_persen is set
+            if ($product['diskon_persen']) {
+                $product['harga_diskon'] = $product['harga'] - ($product['harga'] * $product['diskon_persen'] / 100);
+            }
             Product::create($product);
         }
     }

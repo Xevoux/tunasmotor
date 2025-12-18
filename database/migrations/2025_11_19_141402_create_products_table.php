@@ -21,8 +21,6 @@ return new class extends Migration
             $table->integer('stok');
             $table->integer('terjual')->default(0);
             $table->string('gambar')->nullable();
-            $table->decimal('rating', 2, 1)->default(0);
-            $table->integer('jumlah_rating')->default(0);
             $table->boolean('is_new')->default(false);
             $table->integer('diskon_persen')->nullable();
             $table->timestamps();

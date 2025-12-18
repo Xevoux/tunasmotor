@@ -56,7 +56,7 @@ class CartController extends Controller
             $total += $harga * $cart->jumlah;
         }
 
-        return view('cart', compact('carts', 'total'));
+        return view('layouts.pages.cart', compact('carts', 'total'));
     }
 
     public function update(Request $request, $id)

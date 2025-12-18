@@ -15,8 +15,6 @@ class Product extends Model
         'stok',
         'terjual',
         'gambar',
-        'rating',
-        'jumlah_rating',
         'is_new',
         'diskon_persen',
     ];
@@ -25,7 +23,6 @@ class Product extends Model
         'is_new' => 'boolean',
         'harga' => 'decimal:2',
         'harga_diskon' => 'decimal:2',
-        'rating' => 'decimal:1',
     ];
 
     public function category()

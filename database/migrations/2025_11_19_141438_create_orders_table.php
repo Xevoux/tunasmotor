@@ -21,6 +21,20 @@ return new class extends Migration
             $table->string('status')->default('pending'); // pending, processing, completed, cancelled
             $table->string('metode_pembayaran')->nullable();
             $table->text('alamat_pengiriman')->nullable();
+            
+            // Midtrans payment fields
+            $table->string('snap_token')->nullable();
+            $table->string('payment_type')->nullable();
+            $table->string('transaction_id')->nullable();
+            $table->string('transaction_status')->nullable();
+            $table->timestamp('paid_at')->nullable();
+            $table->json('payment_details')->nullable();
+            
+            // Shipping info
+            $table->string('nama_penerima')->nullable();
+            $table->string('telepon_penerima')->nullable();
+            $table->text('catatan')->nullable();
+            
             $table->timestamps();
         });
     }

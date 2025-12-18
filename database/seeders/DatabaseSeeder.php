@@ -2,7 +2,6 @@
 
 namespace Database\Seeders;
 
-use App\Models\User;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
 
@@ -15,24 +14,17 @@ class DatabaseSeeder extends Seeder
      */
     public function run(): void
     {
-        // Create admin user
-        User::create([
-            'name' => 'Admin',
-            'email' => 'admin@tunasmotor.com',
-            'password' => bcrypt('password'),
-        ]);
-
-        // Create test user
-        User::create([
-            'name' => 'User Test',
-            'email' => 'user@test.com',
-            'password' => bcrypt('password'),
-        ]);
-
-        // Seed categories and products
+        // Seed in order: Admin first, then categories, then products
         $this->call([
+            UserSeeder::class,
             CategorySeeder::class,
             ProductSeeder::class,
+            CustomerServiceSeeder::class,
+            SubscriberSeeder::class,
+            NewsletterSeeder::class,
+            SliderSeeder::class,
+            HeroSeeder::class,
+            FooterSeeder::class,
         ]);
     }
 }

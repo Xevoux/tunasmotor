@@ -88,7 +88,7 @@
 
             <div class="terms">
                 Dengan mendaftar, Anda menyetujui 
-                <a href="#">Syarat & Ketentuan</a> dan <a href="#">Kebijakan Privasi</a> Tunas Motor.
+                <a href="{{ route('terms') }}">Syarat & Ketentuan</a> dan <a href="{{ route('privacy-policy') }}">Kebijakan Privasi</a> Tunas Motor.
             </div>
         </form>
 
@@ -98,12 +98,5 @@
     </div>
 </div>
 
-<script>
-function togglePassword(fieldId) {
-    const passwordInput = document.getElementById(fieldId);
-    const type = passwordInput.type === 'password' ? 'text' : 'password';
-    passwordInput.type = type;
-}
-</script>
 @endsection
 

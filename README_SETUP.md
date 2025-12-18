@@ -11,13 +11,16 @@ Website e-commerce untuk penjualan sparepart motor dengan tampilan modern dan re
 - ⭐ Rating dan review produk
 - 🎨 UI/UX modern dan responsif
 - 🔍 Pencarian produk
-- 💳 Sistem diskon dan kupon
+- 🖼️ Image slider dengan auto-play
+- 💰 **Payment Gateway Midtrans** - Transfer Bank, E-Wallet, Kartu Kredit
+- 📋 Riwayat pesanan dan tracking status
 
 ## Teknologi yang Digunakan
 
-- **Backend**: Laravel 11
+- **Backend**: Laravel 12
 - **Frontend**: Blade Templates, CSS3, JavaScript (Vanilla)
-- **Database**: MySQL
+- **Database**: SQLite (default) / MySQL
+- **Payment Gateway**: Midtrans
 - **Package Manager**: Composer, NPM
 
 ## Persyaratan Sistem
@@ -101,7 +104,43 @@ Perintah ini akan:
 php artisan storage:link
 ```
 
-### 6. Jalankan Server
+### 6. Konfigurasi Midtrans Payment Gateway
+
+#### A. Daftar Akun Midtrans
+
+1. Kunjungi [Midtrans Dashboard](https://dashboard.sandbox.midtrans.com) untuk sandbox/testing
+2. Daftar akun baru atau login dengan akun yang sudah ada
+3. Buka menu **Settings > Access Keys**
+4. Catat **Merchant ID**, **Client Key**, dan **Server Key**
+
+#### B. Konfigurasi di File .env
+
+Tambahkan konfigurasi berikut di file `.env`:
+
+```env
+# Midtrans Configuration
+MIDTRANS_MERCHANT_ID=your_merchant_id
+MIDTRANS_CLIENT_KEY=your_client_key
+MIDTRANS_SERVER_KEY=your_server_key
+MIDTRANS_IS_PRODUCTION=false
+MIDTRANS_IS_SANITIZED=true
+MIDTRANS_IS_3DS=true
+```
+
+**Catatan:**
+- Gunakan kredensial **Sandbox** untuk development/testing
+- Set `MIDTRANS_IS_PRODUCTION=true` hanya untuk production dengan kredensial live
+
+#### C. Konfigurasi Webhook/Callback URL (Opsional)
+
+1. Buka Midtrans Dashboard > Settings > Configuration
+2. Pada bagian **Payment Notification URL**, masukkan:
+   ```
+   https://yourdomain.com/payment/callback
+   ```
+3. Untuk testing lokal, gunakan tool seperti [ngrok](https://ngrok.com) untuk membuat tunnel
+
+### 7. Jalankan Server
 
 ```bash
 php artisan serve
@@ -137,7 +176,7 @@ One-page website dengan section:
 - **Hero Section**: Banner dengan countdown timer deal
 - **Features**: Original Products, Affordable Rates, Wide Variety
 - **New Arrivals**: Grid produk terbaru
-- **Discount Banner**: Banner diskon dengan kode kupon
+- **Image Slider**: Slider gambar otomatis dengan navigasi dan admin panel
 - **Products**: Grid semua produk dengan filter dan search
 - **Footer**: Form subscribe, contact info, links
 
@@ -146,8 +185,36 @@ One-page website dengan section:
 - Update quantity produk
 - Hapus produk dari keranjang
 - Summary total harga
-- Input kupon diskon
 - Tombol checkout
+
+### 5. Checkout Page (`/checkout`)
+- Form informasi pengiriman
+- Ringkasan pesanan
+- Pilih metode pembayaran
+- Proses pembayaran via Midtrans
+
+### 6. Payment Page (`/checkout/payment/{order}`)
+- Halaman pembayaran Midtrans Snap
+- Pilih metode pembayaran (Transfer Bank, E-Wallet, dll)
+- Proses pembayaran real-time
+
+### 7. Orders Page (`/orders`)
+- Riwayat semua pesanan
+- Status pesanan (Pending, Dibayar, Diproses, Dikirim, Selesai)
+- Tombol bayar untuk pesanan yang belum dibayar
+- Link ke detail pesanan
+
+### 8. Order Detail Page (`/orders/{order}`)
+- Detail pesanan lengkap
+- Daftar produk yang dipesan
+- Alamat pengiriman
+- Status pembayaran
+- Tombol batalkan pesanan (jika masih pending)
+
+### 9. Profile Page (`/profile`)
+- Edit informasi profil
+- Simpan alamat pengiriman default
+- Ubah password
 
 ## Cara Menggunakan
 
@@ -176,6 +243,9 @@ One-page website dengan section:
 - `HomeController.php` - Menampilkan halaman home dengan produk
 - `AuthController.php` - Handle login, register, logout
 - `CartController.php` - Manage keranjang belanja
+- `CheckoutController.php` - Proses checkout dan integrasi Midtrans
+- `OrderController.php` - Riwayat dan detail pesanan
+- `ProfileController.php` - Manage profil user
 - `ProductController.php` - Manage produk (untuk admin)
 
 ### Views
@@ -183,6 +253,11 @@ One-page website dengan section:
 - `auth/register.blade.php` - Halaman register
 - `home.blade.php` - Halaman home one-page
 - `cart.blade.php` - Halaman keranjang belanja
+- `checkout.blade.php` - Halaman checkout
+- `payment.blade.php` - Halaman pembayaran Midtrans
+- `orders/index.blade.php` - Riwayat pesanan
+- `orders/show.blade.php` - Detail pesanan
+- `profile.blade.php` - Halaman profil
 - `layouts/app.blade.php` - Layout template utama
 
 ### Assets
@@ -226,6 +301,28 @@ php artisan config:clear
 1. Clear browser cache
 2. Pastikan file `public/css/style.css` dan `public/js/app.js` ada
 3. Jalankan: `php artisan view:clear`
+
+### Midtrans Snap tidak muncul
+
+**Solusi:**
+1. Pastikan kredensial Midtrans di file `.env` sudah benar
+2. Jalankan: `composer require midtrans/midtrans-php` jika package belum terinstall
+3. Cek console browser untuk error JavaScript
+4. Pastikan domain sudah didaftarkan di Midtrans Dashboard (untuk production)
+
+### Error 403 pada callback Midtrans
+
+**Solusi:**
+1. Pastikan route callback sudah dikecualikan dari CSRF verification
+2. Cek file `bootstrap/app.php` untuk konfigurasi CSRF exception
+3. Untuk testing lokal, gunakan ngrok dan daftarkan URL di Midtrans Dashboard
+
+### Pesanan tidak terupdate setelah pembayaran
+
+**Solusi:**
+1. Cek log Laravel di `storage/logs/laravel.log`
+2. Pastikan webhook URL sudah terdaftar di Midtrans Dashboard
+3. Verifikasi signature key di callback handler
 
 ## Fitur Tambahan (Opsional)
 

@@ -15,7 +15,7 @@ class ProfileController extends Controller
     public function show()
     {
         $user = Auth::user();
-        return view('profile', compact('user'));
+        return view('layouts.pages.profile', compact('user'));
     }
 
     /**
@@ -35,6 +35,10 @@ class ProfileController extends Controller
                 'max:255',
                 Rule::unique('users')->ignore($user->id)
             ],
+            'phone' => 'nullable|string|max:20',
+            'address' => 'nullable|string|max:1000',
+            'city' => 'nullable|string|max:255',
+            'postal_code' => 'nullable|string|max:10',
             'current_password' => 'nullable|required_with:new_password',
             'new_password' => 'nullable|min:8|confirmed',
         ], [
@@ -60,9 +64,13 @@ class ProfileController extends Controller
             $user->password = Hash::make($request->new_password);
         }
 
-        // Update nama dan email
+        // Update profile fields
         $user->name = $validated['name'];
         $user->email = $validated['email'];
+        $user->phone = $validated['phone'] ?? $user->phone;
+        $user->address = $validated['address'] ?? $user->address;
+        $user->city = $validated['city'] ?? $user->city;
+        $user->postal_code = $validated['postal_code'] ?? $user->postal_code;
         $user->save();
 
         return redirect()->route('profile.show')

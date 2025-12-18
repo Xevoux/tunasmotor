@@ -11,7 +11,11 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
-        //
+        // Exclude Midtrans callback from CSRF verification
+        $middleware->validateCsrfTokens(except: [
+            'payment/callback',
+            'midtrans/callback', // Webhook from Midtrans
+        ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         //
