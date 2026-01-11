@@ -383,8 +383,10 @@ class CheckoutController extends Controller
             } catch (\Exception $e) {
                 Log::error('Failed to send paid invoice email: ' . $e->getMessage());
             }
-        }
+        // === PERBAIKAN DI SINI: Menambahkan elseif untuk status pending ===
+        } elseif ($transactionStatus == 'pending') {
             $order->update(['status' => Order::STATUS_PENDING]);
+        // === BATAS PERBAIKAN ===
         } elseif (in_array($transactionStatus, ['deny', 'cancel'])) {
             $order->update(['status' => Order::STATUS_CANCELLED]);
             // Restore stock
@@ -496,4 +498,3 @@ class CheckoutController extends Controller
         }
     }
 }
-
