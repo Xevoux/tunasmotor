@@ -31,7 +31,7 @@
                     <div class="order-items">
                         @foreach($order->orderItems as $item)
                         <div class="order-item">
-                            <span class="item-name">{{ $item->product->nama }}</span>
+                            <span class="item-name">{{ $item->product->nama ?? 'Produk tidak tersedia' }}</span>
                             <span class="item-qty">x{{ $item->jumlah }}</span>
                             <span class="item-price">Rp{{ number_format($item->subtotal, 0, ',', '.') }}</span>
                         </div>

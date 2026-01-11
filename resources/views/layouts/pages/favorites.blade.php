@@ -17,7 +17,7 @@
             <div class="favorites-grid" id="favoritesGrid">
                 @foreach($favorites as $favorite)
                 <div class="favorite-item" data-favorite-id="{{ $favorite->id }}">
-                    <div class="favorite-card">
+                    <div class="favorite-card {{ $favorite->product->stok == 0 ? 'out-of-stock' : '' }}">
                         @if($favorite->product->diskon_persen)
                             <span class="badge-discount">-{{ $favorite->product->diskon_persen }}%</span>
                         @endif

@@ -17,7 +17,7 @@ class RedirectToMainLogin
     {
         // If user is not authenticated, redirect to main login
         if (!Auth::check()) {
-            return redirect()->route('login')->with('error', 'Silakan login terlebih dahulu.');
+            return redirect()->route('welcome')->with('error', 'Silakan login terlebih dahulu.');
         }
 
         // If user is authenticated but not admin, redirect to home with error

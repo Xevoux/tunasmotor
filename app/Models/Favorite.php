@@ -11,6 +11,11 @@ class Favorite extends Model
         'product_id',
     ];
 
+    protected $casts = [
+        'user_id' => 'integer',
+        'product_id' => 'integer',
+    ];
+
     /**
      * Get the user that owns the favorite.
      */

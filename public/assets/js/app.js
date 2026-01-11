@@ -1,7 +1,103 @@
 // App.js - Main JavaScript file for Tunas Motor
 
+/* =====================================================
+   CSRF TOKEN MANAGEMENT
+   Handles session expiration and token refresh for production
+   ===================================================== */
+
+// Global CSRF token refresh interval (refresh every 30 minutes)
+let csrfRefreshInterval = null;
+
+// Initialize CSRF token management
+function initializeCsrfManagement() {
+    // Set up axios/fetch interceptor for CSRF errors
+    setupCsrfErrorHandler();
+    
+    // Refresh CSRF token periodically (every 30 minutes)
+    csrfRefreshInterval = setInterval(refreshCsrfToken, 30 * 60 * 1000);
+    
+    // Refresh on page visibility change (when user returns to tab)
+    document.addEventListener('visibilitychange', function() {
+        if (document.visibilityState === 'visible') {
+            refreshCsrfToken();
+        }
+    });
+}
+
+// Refresh CSRF token from server
+function refreshCsrfToken() {
+    fetch('/csrf-token', {
+        method: 'GET',
+        headers: {
+            'Accept': 'application/json',
+            'X-Requested-With': 'XMLHttpRequest'
+        },
+        credentials: 'same-origin'
+    })
+    .then(response => {
+        if (response.ok) {
+            return response.json();
+        }
+        throw new Error('Failed to refresh CSRF token');
+    })
+    .then(data => {
+        if (data.token) {
+            // Update the meta tag
+            const csrfMeta = document.querySelector('meta[name="csrf-token"]');
+            if (csrfMeta) {
+                csrfMeta.setAttribute('content', data.token);
+            }
+            // Update all hidden CSRF inputs in forms
+            document.querySelectorAll('input[name="_token"]').forEach(input => {
+                input.value = data.token;
+            });
+            console.log('CSRF token refreshed successfully');
+        }
+    })
+    .catch(error => {
+        console.warn('Could not refresh CSRF token:', error.message);
+    });
+}
+
+// Handle CSRF/419 errors globally
+function setupCsrfErrorHandler() {
+    // Store original fetch
+    const originalFetch = window.fetch;
+    
+    // Override fetch to handle 419 errors
+    window.fetch = function(...args) {
+        return originalFetch.apply(this, args)
+            .then(response => {
+                if (response.status === 419) {
+                    // Session expired - refresh token and retry once, or redirect
+                    console.warn('Session expired (419). Attempting to refresh...');
+                    
+                    // Show user-friendly notification
+                    if (typeof showNotification === 'function') {
+                        showNotification('Session kedaluwarsa. Memuat ulang...', 'warning');
+                    }
+                    
+                    // Try to refresh the page after a short delay
+                    setTimeout(() => {
+                        window.location.reload();
+                    }, 1500);
+                }
+                return response;
+            });
+    };
+}
+
+// Get current CSRF token
+function getCsrfToken() {
+    const meta = document.querySelector('meta[name="csrf-token"]');
+    return meta ? meta.getAttribute('content') : '';
+}
+
 document.addEventListener('DOMContentLoaded', function() {
     console.log('Tunas Motor App Loaded');
+    
+    // Initialize CSRF token management for production
+    initializeCsrfManagement();
     
     // Check if we're on a page that needs user authentication
     const csrfToken = document.querySelector('meta[name="csrf-token"]');

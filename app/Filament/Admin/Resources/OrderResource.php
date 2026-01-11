@@ -84,7 +84,8 @@ class OrderResource extends Resource
                 Tables\Columns\TextColumn::make('user.name')
                     ->label('Customer')
                     ->searchable()
-                    ->sortable(),
+                    ->sortable()
+                    ->default('User tidak tersedia'),
                 Tables\Columns\TextColumn::make('total_bayar')
                     ->label('Total')
                     ->money('IDR')
@@ -128,6 +129,28 @@ class OrderResource extends Resource
             ->actions([
                 Tables\Actions\ViewAction::make(),
                 Tables\Actions\EditAction::make(),
+                Tables\Actions\Action::make('confirmCodPayment')
+                    ->label('Konfirmasi COD')
+                    ->icon('heroicon-o-check-circle')
+                    ->color('success')
+                    ->visible(fn (Order $record): bool => $record->metode_pembayaran === 'COD' && $record->status === Order::STATUS_PROCESSING)
+                    ->requiresConfirmation()
+                    ->modalHeading('Konfirmasi Pembayaran COD')
+                    ->modalDescription('Apakah Anda yakin ingin mengkonfirmasi bahwa pembayaran COD telah diterima? Invoice akan dikirim ke email customer.')
+                    ->modalSubmitActionLabel('Ya, Konfirmasi')
+                    ->action(function (Order $record): void {
+                        $record->update([
+                            'status' => Order::STATUS_PAID,
+                            'paid_at' => now(),
+                        ]);
+
+                        // Send paid invoice email
+                        try {
+                            Mail::to($record->user->email)->send(new InvoiceMail($record, true));
+                        } catch (\Exception $e) {
+                            Log::error('Failed to send paid invoice email for COD: ' . $e->getMessage());
+                        }
+                    }),
                 Tables\Actions\Action::make('updateStatus')
                     ->label('Update Status')
                     ->icon('heroicon-o-arrow-path')
@@ -214,7 +237,8 @@ class OrderResource extends Resource
                             ->label('')
                             ->schema([
                                 Infolists\Components\TextEntry::make('product.nama')
-                                    ->label('Produk'),
+                                    ->label('Produk')
+                                    ->default('Produk tidak tersedia'),
                                 Infolists\Components\TextEntry::make('jumlah')
                                     ->label('Qty'),
                                 Infolists\Components\TextEntry::make('harga')

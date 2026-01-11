@@ -12,6 +12,12 @@ class Cart extends Model
         'jumlah',
     ];
 
+    protected $casts = [
+        'user_id' => 'integer',
+        'product_id' => 'integer',
+        'jumlah' => 'integer',
+    ];
+
     public function user()
     {
         return $this->belongsTo(User::class);

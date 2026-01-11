@@ -25,6 +25,11 @@ Route::get('/syarat-ketentuan', function () {
     return view('layouts.pages.terms');
 })->name('terms');
 
+// CSRF Token refresh route - used by JavaScript to refresh expired tokens
+Route::get('/csrf-token', function () {
+    return response()->json(['token' => csrf_token()]);
+})->name('csrf.refresh');
+
 // Auth routes (accessible by all - admin will be redirected to admin panel after login)
 Route::get('/login', [AuthController::class, 'showLogin'])->name('login');
 Route::post('/login', [AuthController::class, 'login']);
@@ -97,21 +102,18 @@ Route::middleware(['auth', 'customer'])->group(function () {
     Route::get('/orders/{order}/retry-payment', [OrderController::class, 'retryPayment'])->name('orders.retry-payment');
 });
 
-// Midtrans callback (no auth required)
-Route::post('/payment/callback', [CheckoutController::class, 'callback'])->name('payment.callback');
-
 // Subscriber routes (no auth required)
 Route::post('/subscribe', [SubscriberController::class, 'subscribe'])->name('subscribe');
 Route::post('/unsubscribe', [SubscriberController::class, 'unsubscribe'])->name('unsubscribe');
 Route::get('/check-subscription', [SubscriberController::class, 'checkSubscription'])->name('check.subscription');
 
 // Admin Report Export routes (protected - admin only)
-Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(function () {
+Route::middleware(['auth', 'admin'])->prefix('admin-reports')->name('admin-reports.')->group(function () {
     // PDF Exports
     Route::get('/orders/export-pdf', [ReportController::class, 'exportOrdersPdf'])->name('orders.export-pdf');
     Route::get('/products/export-pdf', [ReportController::class, 'exportProductsPdf'])->name('products.export-pdf');
     Route::get('/sales-summary/export-pdf', [ReportController::class, 'exportSalesSummaryPdf'])->name('sales-summary.export-pdf');
-    
+
     // Excel Exports
     Route::get('/orders/export-excel', [ReportController::class, 'exportOrdersExcel'])->name('orders.export-excel');
     Route::get('/products/export-excel', [ReportController::class, 'exportProductsExcel'])->name('products.export-excel');

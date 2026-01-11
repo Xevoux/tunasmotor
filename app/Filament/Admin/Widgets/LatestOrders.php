@@ -24,7 +24,8 @@ class LatestOrders extends BaseWidget
                     ->label('No. Pesanan')
                     ->searchable(),
                 Tables\Columns\TextColumn::make('user.name')
-                    ->label('Customer'),
+                    ->label('Customer')
+                    ->default('User tidak tersedia'),
                 Tables\Columns\TextColumn::make('total_bayar')
                     ->label('Total')
                     ->money('IDR'),

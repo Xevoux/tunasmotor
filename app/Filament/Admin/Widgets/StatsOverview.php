@@ -12,9 +12,12 @@ class StatsOverview extends BaseWidget
 {
     protected function getStats(): array
     {
-        $totalRevenue = Order::where('status', Order::STATUS_PAID)
-            ->orWhere('status', Order::STATUS_COMPLETED)
-            ->sum('total_bayar');
+        $totalRevenue = Order::whereIn('status', [
+            Order::STATUS_PAID, 
+            Order::STATUS_COMPLETED,
+            Order::STATUS_PROCESSING,
+            Order::STATUS_SHIPPED
+        ])->sum('total_bayar');
 
         $pendingOrders = Order::where('status', Order::STATUS_PENDING)->count();
 

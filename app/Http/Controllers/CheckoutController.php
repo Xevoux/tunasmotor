@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Mail\InvoiceMail;
 use App\Models\Cart;
 use App\Models\Order;
 use App\Models\OrderItem;
@@ -9,6 +10,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Mail;
 
 class CheckoutController extends Controller
 {
@@ -19,8 +21,15 @@ class CheckoutController extends Controller
     {
         $user = Auth::user();
         $carts = Cart::where('user_id', $user->id)
-            ->with('product')
+            ->with(['product.category'])
             ->get();
+
+        // Remove cart items with deleted products
+        $invalidCarts = $carts->filter(fn($cart) => !$cart->product);
+        if ($invalidCarts->count() > 0) {
+            Cart::whereIn('id', $invalidCarts->pluck('id'))->delete();
+            $carts = $carts->filter(fn($cart) => $cart->product);
+        }
 
         if ($carts->isEmpty()) {
             return redirect()->route('cart.index')
@@ -30,8 +39,10 @@ class CheckoutController extends Controller
         // Calculate totals
         $subtotal = 0;
         foreach ($carts as $cart) {
-            $harga = $cart->product->harga_diskon ?? $cart->product->harga;
-            $subtotal += $harga * $cart->jumlah;
+            if ($cart->product) {
+                $harga = $cart->product->harga_diskon ?? $cart->product->harga;
+                $subtotal += $harga * $cart->jumlah;
+            }
         }
 
         return view('layouts.pages.checkout', compact('carts', 'subtotal', 'user'));
@@ -60,6 +71,13 @@ class CheckoutController extends Controller
             ->with('product')
             ->get();
 
+        // Remove cart items with deleted products
+        $invalidCarts = $carts->filter(fn($cart) => !$cart->product);
+        if ($invalidCarts->count() > 0) {
+            Cart::whereIn('id', $invalidCarts->pluck('id'))->delete();
+            $carts = $carts->filter(fn($cart) => $cart->product);
+        }
+
         if ($carts->isEmpty()) {
             return redirect()->route('cart.index')
                 ->with('error', 'Keranjang belanja Anda kosong');
@@ -67,8 +85,10 @@ class CheckoutController extends Controller
 
         // Check stock availability
         foreach ($carts as $cart) {
-            if ($cart->product->stok < $cart->jumlah) {
-                return back()->with('error', "Stok {$cart->product->nama} tidak mencukupi. Tersedia: {$cart->product->stok}");
+            if (!$cart->product || $cart->product->stok < $cart->jumlah) {
+                $productName = $cart->product->nama ?? 'Produk';
+                $availableStock = $cart->product->stok ?? 0;
+                return back()->with('error', "Stok {$productName} tidak mencukupi. Tersedia: {$availableStock}");
             }
         }
 
@@ -124,6 +144,13 @@ class CheckoutController extends Controller
 
                 DB::commit();
 
+                // Send unpaid invoice email
+                try {
+                    Mail::to($order->user->email)->send(new InvoiceMail($order, false));
+                } catch (\Exception $e) {
+                    Log::error('Failed to send unpaid invoice email: ' . $e->getMessage());
+                }
+
                 return redirect()->route('orders.show', $order->id)
                     ->with('success', 'Pesanan COD berhasil dibuat! Siapkan pembayaran saat barang diterima.');
             }
@@ -156,14 +183,27 @@ class CheckoutController extends Controller
      */
     public function payment(Order $order)
     {
+        // Check if user is authenticated
+        if (!Auth::check()) {
+            return redirect()->route('login')
+                ->with('error', 'Silakan login terlebih dahulu untuk melakukan pembayaran.');
+        }
+
         // Verify ownership
         if ($order->user_id !== Auth::id()) {
-            abort(403);
+            return redirect()->route('orders.index')
+                ->with('error', 'Anda tidak memiliki akses ke pesanan ini.');
         }
 
         if (!$order->canBePaid()) {
             return redirect()->route('orders.show', $order->id)
                 ->with('info', 'Pesanan ini sudah dibayar atau tidak dapat dibayar.');
+        }
+
+        // Ensure snap token exists
+        if (empty($order->snap_token)) {
+            return redirect()->route('orders.show', $order->id)
+                ->with('error', 'Token pembayaran tidak tersedia. Silakan hubungi admin.');
         }
 
         $order->load('orderItems.product');
@@ -209,10 +249,11 @@ class CheckoutController extends Controller
         \Midtrans\Config::$isSanitized = config('services.midtrans.is_sanitized');
         \Midtrans\Config::$is3ds = config('services.midtrans.is_3ds');
         
-        // Ensure secure connection
+        // SSL verification - enable in production, disable in local
+        $isProduction = config('services.midtrans.is_production');
         \Midtrans\Config::$curlOptions = [
-            CURLOPT_SSL_VERIFYPEER => false, // Disable SSL verification for local testing
-            CURLOPT_SSL_VERIFYHOST => 0,
+            CURLOPT_SSL_VERIFYPEER => $isProduction,
+            CURLOPT_SSL_VERIFYHOST => $isProduction ? 2 : 0,
         ];
 
         $order->load('orderItems.product', 'user');
@@ -220,11 +261,14 @@ class CheckoutController extends Controller
         // Build item details
         $items = [];
         foreach ($order->orderItems as $item) {
+            // Handle case where product might have been deleted
+            $productName = $item->product ? $item->product->nama : 'Produk #' . $item->product_id;
+            
             $items[] = [
                 'id' => $item->product_id,
                 'price' => (int) $item->harga,
                 'quantity' => $item->jumlah,
-                'name' => substr($item->product->nama, 0, 50),
+                'name' => substr($productName, 0, 50),
             ];
         }
 
@@ -319,13 +363,27 @@ class CheckoutController extends Controller
                     'status' => Order::STATUS_PAID,
                     'paid_at' => now(),
                 ]);
+
+                // Send paid invoice email
+                try {
+                    Mail::to($order->user->email)->send(new InvoiceMail($order, true));
+                } catch (\Exception $e) {
+                    Log::error('Failed to send paid invoice email: ' . $e->getMessage());
+                }
             }
         } elseif ($transactionStatus == 'settlement') {
             $order->update([
                 'status' => Order::STATUS_PAID,
                 'paid_at' => now(),
             ]);
-        } elseif ($transactionStatus == 'pending') {
+
+            // Send paid invoice email
+            try {
+                Mail::to($order->user->email)->send(new InvoiceMail($order, true));
+            } catch (\Exception $e) {
+                Log::error('Failed to send paid invoice email: ' . $e->getMessage());
+            }
+        }
             $order->update(['status' => Order::STATUS_PENDING]);
         } elseif (in_array($transactionStatus, ['deny', 'cancel'])) {
             $order->update(['status' => Order::STATUS_CANCELLED]);
@@ -345,22 +403,30 @@ class CheckoutController extends Controller
      */
     public function finish(Request $request, Order $order)
     {
+        // Check if user is authenticated
+        if (!Auth::check()) {
+            return redirect()->route('login')
+                ->with('error', 'Silakan login terlebih dahulu untuk melihat pesanan.');
+        }
+
         if ($order->user_id !== Auth::id()) {
-            abort(403);
+            return redirect()->route('orders.index')
+                ->with('error', 'Anda tidak memiliki akses ke pesanan ini.');
         }
 
         // Check transaction status from Midtrans
         try {
             // Set Midtrans configuration
             \Midtrans\Config::$serverKey = config('services.midtrans.server_key');
-            \Midtrans\Config::$isProduction = false; // Keep sandbox for now
+            \Midtrans\Config::$isProduction = config('services.midtrans.is_production');
             \Midtrans\Config::$isSanitized = config('services.midtrans.is_sanitized');
             \Midtrans\Config::$is3ds = config('services.midtrans.is_3ds');
             
-            // Disable SSL verification for local testing
+            // SSL verification - enable in production, disable in local
+            $isProduction = config('services.midtrans.is_production');
             \Midtrans\Config::$curlOptions = [
-                CURLOPT_SSL_VERIFYPEER => false,
-                CURLOPT_SSL_VERIFYHOST => 0,
+                CURLOPT_SSL_VERIFYPEER => $isProduction,
+                CURLOPT_SSL_VERIFYHOST => $isProduction ? 2 : 0,
             ];
 
             // Get transaction status from Midtrans
@@ -422,8 +488,11 @@ class CheckoutController extends Controller
     private function restoreStock(Order $order): void
     {
         foreach ($order->orderItems as $item) {
-            $item->product->increment('stok', $item->jumlah);
-            $item->product->decrement('terjual', $item->jumlah);
+            // Check if product still exists before restoring stock
+            if ($item->product) {
+                $item->product->increment('stok', $item->jumlah);
+                $item->product->decrement('terjual', $item->jumlah);
+            }
         }
     }
 }

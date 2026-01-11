@@ -19,38 +19,53 @@ class ReportController extends Controller
      */
     public function exportOrdersPdf(Request $request)
     {
-        $startDate = $request->get('start_date', Carbon::now()->startOfMonth()->format('Y-m-d'));
-        $endDate = $request->get('end_date', Carbon::now()->format('Y-m-d'));
-        $status = $request->get('status');
+        try {
+            $startDate = $request->get('start_date', Carbon::now()->startOfMonth()->format('Y-m-d'));
+            $endDate = $request->get('end_date', Carbon::now()->format('Y-m-d'));
+            $status = $request->get('status');
 
-        $query = Order::with(['user', 'orderItems.product'])
-            ->whereBetween('created_at', [$startDate, Carbon::parse($endDate)->endOfDay()]);
+            // Validate dates
+            $startDateObj = Carbon::parse($startDate)->startOfDay();
+            $endDateObj = Carbon::parse($endDate)->endOfDay();
 
-        if ($status && $status !== 'all') {
-            $query->where('status', $status);
+            $query = Order::with(['user', 'orderItems.product'])
+                ->whereBetween('created_at', [$startDateObj, $endDateObj]);
+
+            if ($status && $status !== 'all') {
+                $query->where('status', $status);
+            }
+
+            $orders = $query->orderBy('created_at', 'desc')->get();
+
+            // Filter orders with valid data to prevent errors
+            $orders = $orders->filter(function ($order) {
+                return !empty($order->nomor_pesanan) && !empty($order->nama_penerima);
+            });
+
+            // Hitung statistik
+            $totalRevenue = $orders->whereIn('status', [Order::STATUS_PAID, Order::STATUS_COMPLETED, Order::STATUS_PROCESSING, Order::STATUS_SHIPPED])->sum('total_bayar');
+            $totalOrders = $orders->count();
+            $paidOrders = $orders->whereIn('status', [Order::STATUS_PAID, Order::STATUS_COMPLETED, Order::STATUS_PROCESSING, Order::STATUS_SHIPPED])->count();
+
+            $data = [
+                'orders' => $orders,
+                'startDate' => $startDateObj->format('d M Y'),
+                'endDate' => $endDateObj->format('d M Y'),
+                'totalRevenue' => $totalRevenue ?? 0,
+                'totalOrders' => $totalOrders ?? 0,
+                'paidOrders' => $paidOrders ?? 0,
+                'generatedAt' => Carbon::now()->format('d M Y H:i'),
+            ];
+
+            $pdf = Pdf::loadView('admin.reports.orders-pdf', $data);
+            $pdf->setPaper('A4', 'landscape');
+
+            return $pdf->download('Laporan_Pesanan_' . date('Y-m-d_H-i-s') . '.pdf');
+        } catch (\Exception $e) {
+            // Log error and return error response
+            \Log::error('Export Orders PDF Error: ' . $e->getMessage());
+            return response()->json(['error' => 'Terjadi kesalahan saat export PDF: ' . $e->getMessage()], 500);
         }
-
-        $orders = $query->orderBy('created_at', 'desc')->get();
-
-        // Hitung statistik
-        $totalRevenue = $orders->whereIn('status', [Order::STATUS_PAID, Order::STATUS_COMPLETED, Order::STATUS_PROCESSING, Order::STATUS_SHIPPED])->sum('total_bayar');
-        $totalOrders = $orders->count();
-        $paidOrders = $orders->whereIn('status', [Order::STATUS_PAID, Order::STATUS_COMPLETED, Order::STATUS_PROCESSING, Order::STATUS_SHIPPED])->count();
-
-        $data = [
-            'orders' => $orders,
-            'startDate' => Carbon::parse($startDate)->format('d M Y'),
-            'endDate' => Carbon::parse($endDate)->format('d M Y'),
-            'totalRevenue' => $totalRevenue,
-            'totalOrders' => $totalOrders,
-            'paidOrders' => $paidOrders,
-            'generatedAt' => Carbon::now()->format('d M Y H:i'),
-        ];
-
-        $pdf = Pdf::loadView('admin.reports.orders-pdf', $data);
-        $pdf->setPaper('A4', 'landscape');
-
-        return $pdf->download('Laporan_Pesanan_' . date('Y-m-d_H-i-s') . '.pdf');
     }
 
     /**
@@ -146,66 +161,90 @@ class ReportController extends Controller
      */
     public function exportOrdersExcel(Request $request)
     {
-        $startDate = $request->get('start_date', Carbon::now()->startOfMonth()->format('Y-m-d'));
-        $endDate = $request->get('end_date', Carbon::now()->format('Y-m-d'));
-        $status = $request->get('status');
+        \Log::info('Export Orders Excel accessed', [
+            'user_id' => auth()->id(),
+            'user_role' => auth()->user()?->role,
+            'params' => $request->all(),
+            'url' => $request->fullUrl()
+        ]);
 
-        $query = Order::with(['user', 'orderItems.product'])
-            ->whereBetween('created_at', [$startDate, Carbon::parse($endDate)->endOfDay()]);
+        try {
+            $startDate = $request->get('start_date', Carbon::now()->startOfMonth()->format('Y-m-d'));
+            $endDate = $request->get('end_date', Carbon::now()->format('Y-m-d'));
+            $status = $request->get('status');
 
-        if ($status && $status !== 'all') {
-            $query->where('status', $status);
-        }
+            \Log::info('Export Orders Excel parameters', compact('startDate', 'endDate', 'status'));
 
-        $orders = $query->orderBy('created_at', 'desc')->get();
+            // Validate dates
+            $startDateObj = Carbon::parse($startDate)->startOfDay();
+            $endDateObj = Carbon::parse($endDate)->endOfDay();
 
-        $filename = 'Laporan_Pesanan_' . date('Y-m-d_H-i-s') . '.xlsx';
-        $tempFile = storage_path('app/public/' . $filename);
+            $query = Order::with(['user', 'orderItems.product'])
+                ->whereBetween('created_at', [$startDateObj, $endDateObj]);
 
-        $options = new Options();
-        $writer = new Writer($options);
-        $writer->openToFile($tempFile);
+            if ($status && $status !== 'all') {
+                $query->where('status', $status);
+            }
 
-        // Header
-        $headerStyle = (new Style())->setFontBold();
-        $writer->addRow(\OpenSpout\Common\Entity\Row::fromValues([
-            'No. Pesanan',
-            'Nama Customer',
-            'Email',
-            'Nama Penerima',
-            'Telepon',
-            'Alamat Pengiriman',
-            'Subtotal',
-            'Diskon',
-            'Total Bayar',
-            'Status',
-            'Metode Pembayaran',
-            'Tanggal Bayar',
-            'Tanggal Order',
-        ], $headerStyle));
+            $orders = $query->orderBy('created_at', 'desc')->get();
 
-        // Data
-        foreach ($orders as $order) {
+            // Filter orders with valid data to prevent errors
+            $orders = $orders->filter(function ($order) {
+                return !empty($order->nomor_pesanan) && !empty($order->nama_penerima);
+            });
+
+            $filename = 'Laporan_Pesanan_' . date('Y-m-d_H-i-s') . '.xlsx';
+            $tempFile = storage_path('app/public/' . $filename);
+
+            $options = new Options();
+            $writer = new Writer($options);
+            $writer->openToFile($tempFile);
+
+            // Header
+            $headerStyle = (new Style())->setFontBold();
             $writer->addRow(\OpenSpout\Common\Entity\Row::fromValues([
-                $order->nomor_pesanan,
-                $order->user->name ?? '-',
-                $order->user->email ?? '-',
-                $order->nama_penerima,
-                $order->telepon_penerima,
-                $order->alamat_pengiriman,
-                'Rp ' . number_format($order->total_harga ?? 0, 0, ',', '.'),
-                'Rp ' . number_format($order->diskon ?? 0, 0, ',', '.'),
-                'Rp ' . number_format($order->total_bayar ?? 0, 0, ',', '.'),
-                Order::getStatuses()[$order->status] ?? $order->status,
-                $order->metode_pembayaran ?? '-',
-                $order->paid_at ? Carbon::parse($order->paid_at)->format('d/m/Y H:i') : '-',
-                $order->created_at->format('d/m/Y H:i'),
-            ]));
+                'No. Pesanan',
+                'Nama Customer',
+                'Email',
+                'Nama Penerima',
+                'Telepon',
+                'Alamat Pengiriman',
+                'Subtotal',
+                'Diskon',
+                'Total Bayar',
+                'Status',
+                'Metode Pembayaran',
+                'Tanggal Bayar',
+                'Tanggal Order',
+            ], $headerStyle));
+
+            // Data
+            foreach ($orders as $order) {
+                $writer->addRow(\OpenSpout\Common\Entity\Row::fromValues([
+                    $order->nomor_pesanan ?? '-',
+                    $order->user?->name ?? '-',
+                    $order->user?->email ?? '-',
+                    $order->nama_penerima ?? '-',
+                    $order->telepon_penerima ?? '-',
+                    $order->alamat_pengiriman ?? '-',
+                    'Rp ' . number_format($order->total_harga ?? 0, 0, ',', '.'),
+                    'Rp ' . number_format($order->diskon ?? 0, 0, ',', '.'),
+                    'Rp ' . number_format($order->total_bayar ?? 0, 0, ',', '.'),
+                    Order::getStatuses()[$order->status] ?? $order->status ?? '-',
+                    $order->metode_pembayaran ?? '-',
+                    $order->paid_at ? Carbon::parse($order->paid_at)->format('d/m/Y H:i') : '-',
+                    $order->created_at ? $order->created_at->format('d/m/Y H:i') : '-',
+                ]));
+            }
+
+            $writer->close();
+
+            return response()->download($tempFile, $filename)->deleteFileAfterSend(true);
+        } catch (\Exception $e) {
+            // Log error and return error response
+            \Log::error('Export Orders Excel Error: ' . $e->getMessage());
+            return response()->json(['error' => 'Terjadi kesalahan saat export Excel: ' . $e->getMessage()], 500);
         }
-
-        $writer->close();
-
-        return response()->download($tempFile, $filename)->deleteFileAfterSend(true);
     }
 
     /**

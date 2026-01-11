@@ -29,6 +29,7 @@ class Order extends Model
     ];
 
     protected $casts = [
+        'user_id' => 'integer',
         'total_harga' => 'decimal:2',
         'diskon' => 'decimal:2',
         'total_bayar' => 'decimal:2',

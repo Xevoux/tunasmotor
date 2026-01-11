@@ -14,6 +14,7 @@ use Filament\Forms\Contracts\HasForms;
 use Filament\Forms\Form;
 use Filament\Actions\Action;
 use Filament\Notifications\Notification;
+use Illuminate\Support\Collection;
 
 class Reports extends Page implements HasForms
 {
@@ -34,6 +35,10 @@ class Reports extends Page implements HasForms
     public ?array $orderFilters = [];
     public ?array $productFilters = [];
     public ?array $salesFilters = [];
+    
+    public bool $showOrderPreview = false;
+    public bool $showProductPreview = false;
+    public bool $showSalesPreview = false;
 
     public function mount(): void
     {
@@ -53,6 +58,21 @@ class Reports extends Page implements HasForms
             'end_date' => now()->format('Y-m-d'),
         ];
     }
+    
+    public function toggleOrderPreview(): void
+    {
+        $this->showOrderPreview = !$this->showOrderPreview;
+    }
+    
+    public function toggleProductPreview(): void
+    {
+        $this->showProductPreview = !$this->showProductPreview;
+    }
+    
+    public function toggleSalesPreview(): void
+    {
+        $this->showSalesPreview = !$this->showSalesPreview;
+    }
 
     protected function getForms(): array
     {
@@ -69,14 +89,17 @@ class Reports extends Page implements HasForms
             ->schema([
                 DatePicker::make('start_date')
                     ->label('Tanggal Mulai')
-                    ->default(now()->startOfMonth()),
+                    ->default(now()->startOfMonth())
+                    ->live(),
                 DatePicker::make('end_date')
                     ->label('Tanggal Akhir')
-                    ->default(now()),
+                    ->default(now())
+                    ->live(),
                 Select::make('status')
                     ->label('Status')
                     ->options(array_merge(['all' => 'Semua Status'], Order::getStatuses()))
-                    ->default('all'),
+                    ->default('all')
+                    ->live(),
             ])
             ->columns(3)
             ->statePath('orderFilters');
@@ -89,7 +112,8 @@ class Reports extends Page implements HasForms
                 Select::make('category_id')
                     ->label('Kategori')
                     ->options(Category::all()->pluck('nama', 'id'))
-                    ->placeholder('Semua Kategori'),
+                    ->placeholder('Semua Kategori')
+                    ->live(),
                 Select::make('stock_filter')
                     ->label('Filter Stok')
                     ->options([
@@ -97,7 +121,8 @@ class Reports extends Page implements HasForms
                         'low' => 'Stok Rendah (≤10)',
                         'out' => 'Stok Habis',
                     ])
-                    ->default('all'),
+                    ->default('all')
+                    ->live(),
             ])
             ->columns(2)
             ->statePath('productFilters');
@@ -109,10 +134,12 @@ class Reports extends Page implements HasForms
             ->schema([
                 DatePicker::make('start_date')
                     ->label('Tanggal Mulai')
-                    ->default(now()->startOfMonth()),
+                    ->default(now()->startOfMonth())
+                    ->live(),
                 DatePicker::make('end_date')
                     ->label('Tanggal Akhir')
-                    ->default(now()),
+                    ->default(now())
+                    ->live(),
             ])
             ->columns(2)
             ->statePath('salesFilters');
@@ -140,6 +167,22 @@ class Reports extends Page implements HasForms
             'revenue' => $orders->whereIn('status', [Order::STATUS_PAID, Order::STATUS_COMPLETED, Order::STATUS_PROCESSING, Order::STATUS_SHIPPED])->sum('total_bayar'),
         ];
     }
+    
+    public function getFilteredOrders(): Collection
+    {
+        $query = Order::query()
+            ->with('user')
+            ->whereBetween('created_at', [
+                $this->orderFilters['start_date'] ?? now()->startOfMonth(),
+                \Carbon\Carbon::parse($this->orderFilters['end_date'] ?? now())->endOfDay()
+            ]);
+
+        if (($this->orderFilters['status'] ?? 'all') !== 'all') {
+            $query->where('status', $this->orderFilters['status']);
+        }
+
+        return $query->orderBy('created_at', 'desc')->get();
+    }
 
     public function getProductStats(): array
     {
@@ -165,15 +208,50 @@ class Reports extends Page implements HasForms
             'outOfStock' => $products->where('stok', 0)->count(),
         ];
     }
-
-    public function exportOrdersExcel(): void
+    
+    public function getFilteredProducts(): Collection
     {
-        Notification::make()
-            ->title('Export Dimulai')
-            ->body('File Excel sedang diproses...')
-            ->info()
-            ->send();
+        $query = Product::query()->with('category');
+
+        if ($this->productFilters['category_id'] ?? null) {
+            $query->where('category_id', $this->productFilters['category_id']);
+        }
+
+        if (($this->productFilters['stock_filter'] ?? 'all') === 'low') {
+            $query->where('stok', '<=', 10)->where('stok', '>', 0);
+        } elseif (($this->productFilters['stock_filter'] ?? 'all') === 'out') {
+            $query->where('stok', 0);
+        }
+
+        return $query->orderBy('nama', 'asc')->get();
     }
+    
+    public function getSalesData(): array
+    {
+        $orders = Order::query()
+            ->whereIn('status', [Order::STATUS_PAID, Order::STATUS_COMPLETED, Order::STATUS_PROCESSING, Order::STATUS_SHIPPED])
+            ->whereBetween('created_at', [
+                $this->salesFilters['start_date'] ?? now()->startOfMonth(),
+                \Carbon\Carbon::parse($this->salesFilters['end_date'] ?? now())->endOfDay()
+            ])
+            ->orderBy('created_at', 'desc')
+            ->get();
+            
+        $dailySales = $orders->groupBy(fn ($order) => $order->created_at->format('Y-m-d'))
+            ->map(fn ($dayOrders) => [
+                'date' => $dayOrders->first()->created_at->format('d/m/Y'),
+                'count' => $dayOrders->count(),
+                'total' => $dayOrders->sum('total_bayar'),
+            ])
+            ->values();
+            
+        return [
+            'daily' => $dailySales,
+            'totalOrders' => $orders->count(),
+            'totalRevenue' => $orders->sum('total_bayar'),
+        ];
+    }
+
 
     public function getOrderExportUrl(): string
     {
@@ -183,7 +261,7 @@ class Reports extends Page implements HasForms
             'status' => $this->orderFilters['status'] ?? 'all',
         ]);
 
-        return route('admin.orders.export-pdf') . '?' . $params;
+        return route('admin-reports.orders.export-pdf') . '?' . $params;
     }
 
     public function getProductExportUrl(): string
@@ -193,7 +271,7 @@ class Reports extends Page implements HasForms
             'stock_filter' => $this->productFilters['stock_filter'] ?? 'all',
         ]);
 
-        return route('admin.products.export-pdf') . '?' . $params;
+        return route('admin-reports.products.export-pdf') . '?' . $params;
     }
 
     public function getSalesExportUrl(): string
@@ -203,7 +281,7 @@ class Reports extends Page implements HasForms
             'end_date' => $this->salesFilters['end_date'] ?? now()->format('Y-m-d'),
         ]);
 
-        return route('admin.sales-summary.export-pdf') . '?' . $params;
+        return route('admin-reports.sales-summary.export-pdf') . '?' . $params;
     }
 
     // Excel Export URLs
@@ -215,7 +293,7 @@ class Reports extends Page implements HasForms
             'status' => $this->orderFilters['status'] ?? 'all',
         ]);
 
-        return route('admin.orders.export-excel') . '?' . $params;
+        return route('admin-reports.orders.export-excel') . '?' . $params;
     }
 
     public function getProductExcelUrl(): string
@@ -225,7 +303,7 @@ class Reports extends Page implements HasForms
             'stock_filter' => $this->productFilters['stock_filter'] ?? 'all',
         ]);
 
-        return route('admin.products.export-excel') . '?' . $params;
+        return route('admin-reports.products.export-excel') . '?' . $params;
     }
 
     public function getSalesExcelUrl(): string
@@ -235,7 +313,7 @@ class Reports extends Page implements HasForms
             'end_date' => $this->salesFilters['end_date'] ?? now()->format('Y-m-d'),
         ]);
 
-        return route('admin.sales-summary.export-excel') . '?' . $params;
+        return route('admin-reports.sales-summary.export-excel') . '?' . $params;
     }
 }
 

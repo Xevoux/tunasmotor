@@ -26,9 +26,16 @@ class OrderController extends Controller
      */
     public function show(Order $order)
     {
+        // Check if user is authenticated
+        if (!Auth::check()) {
+            return redirect()->route('login')
+                ->with('error', 'Silakan login terlebih dahulu untuk melihat pesanan.');
+        }
+
         // Verify ownership
         if ($order->user_id !== Auth::id()) {
-            abort(403);
+            return redirect()->route('orders.index')
+                ->with('error', 'Anda tidak memiliki akses ke pesanan ini.');
         }
 
         $order->load('orderItems.product');
@@ -41,9 +48,16 @@ class OrderController extends Controller
      */
     public function cancel(Order $order)
     {
+        // Check if user is authenticated
+        if (!Auth::check()) {
+            return redirect()->route('login')
+                ->with('error', 'Silakan login terlebih dahulu.');
+        }
+
         // Verify ownership
         if ($order->user_id !== Auth::id()) {
-            abort(403);
+            return redirect()->route('orders.index')
+                ->with('error', 'Anda tidak memiliki akses ke pesanan ini.');
         }
 
         if ($order->status !== Order::STATUS_PENDING) {
@@ -52,8 +66,10 @@ class OrderController extends Controller
 
         // Restore stock
         foreach ($order->orderItems as $item) {
-            $item->product->increment('stok', $item->jumlah);
-            $item->product->decrement('terjual', $item->jumlah);
+            if ($item->product) {
+                $item->product->increment('stok', $item->jumlah);
+                $item->product->decrement('terjual', $item->jumlah);
+            }
         }
 
         $order->update(['status' => Order::STATUS_CANCELLED]);
@@ -66,9 +82,16 @@ class OrderController extends Controller
      */
     public function retryPayment(Order $order)
     {
+        // Check if user is authenticated
+        if (!Auth::check()) {
+            return redirect()->route('login')
+                ->with('error', 'Silakan login terlebih dahulu.');
+        }
+
         // Verify ownership
         if ($order->user_id !== Auth::id()) {
-            abort(403);
+            return redirect()->route('orders.index')
+                ->with('error', 'Anda tidak memiliki akses ke pesanan ini.');
         }
 
         if (!$order->canBePaid()) {

@@ -14,6 +14,12 @@
         <form method="POST" action="{{ route('login') }}" class="login-form">
             @csrf
             
+            @if (session('error'))
+                <div class="error-message" style="background-color: #fef3c7; border-color: #f59e0b; color: #92400e;">
+                    {{ session('error') }}
+                </div>
+            @endif
+
             @if ($errors->any())
                 <div class="error-message">
                     {{ $errors->first() }}

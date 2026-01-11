@@ -14,10 +14,22 @@ class FavoriteController extends Controller
      */
     public function index()
     {
+        if (!Auth::check()) {
+            return redirect()->route('login')
+                ->with('error', 'Silakan login terlebih dahulu.');
+        }
+
         $favorites = Auth::user()->favorites()
             ->with('product.category')
             ->latest()
             ->get();
+
+        // Filter out favorites with deleted products
+        $invalidFavorites = $favorites->filter(fn($fav) => !$fav->product);
+        if ($invalidFavorites->count() > 0) {
+            Favorite::whereIn('id', $invalidFavorites->pluck('id'))->delete();
+            $favorites = $favorites->filter(fn($fav) => $fav->product);
+        }
 
         return view('layouts.pages.favorites', compact('favorites'));
     }
@@ -27,6 +39,13 @@ class FavoriteController extends Controller
      */
     public function toggle(Request $request)
     {
+        if (!Auth::check()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Silakan login terlebih dahulu'
+            ], 401);
+        }
+
         $request->validate([
             'product_id' => 'required|exists:products,id'
         ]);
@@ -65,6 +84,13 @@ class FavoriteController extends Controller
      */
     public function remove($id)
     {
+        if (!Auth::check()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Silakan login terlebih dahulu'
+            ], 401);
+        }
+
         $favorite = Favorite::where('user_id', Auth::id())
             ->where('id', $id)
             ->first();
@@ -88,6 +114,10 @@ class FavoriteController extends Controller
      */
     public function count()
     {
+        if (!Auth::check()) {
+            return response()->json(['count' => 0]);
+        }
+
         $count = Auth::user()->favorites()->count();
         return response()->json(['count' => $count]);
     }
@@ -100,6 +130,13 @@ class FavoriteController extends Controller
         // Only allow AJAX requests to prevent direct access showing JSON
         if (!$request->ajax() && !$request->wantsJson()) {
             return redirect()->route('home');
+        }
+
+        if (!Auth::check()) {
+            return response()->json([
+                'success' => true,
+                'favorites' => []
+            ]);
         }
         
         $favoriteIds = Auth::user()->favorites()

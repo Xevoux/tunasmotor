@@ -47,13 +47,22 @@ class CartController extends Controller
         }
 
         $carts = Cart::where('user_id', Auth::id())
-            ->with('product')
+            ->with(['product.category'])
             ->get();
+
+        // Remove cart items with deleted products
+        $invalidCarts = $carts->filter(fn($cart) => !$cart->product);
+        if ($invalidCarts->count() > 0) {
+            Cart::whereIn('id', $invalidCarts->pluck('id'))->delete();
+            $carts = $carts->filter(fn($cart) => $cart->product);
+        }
 
         $total = 0;
         foreach ($carts as $cart) {
-            $harga = $cart->product->harga_diskon ?? $cart->product->harga;
-            $total += $harga * $cart->jumlah;
+            if ($cart->product) {
+                $harga = $cart->product->harga_diskon ?? $cart->product->harga;
+                $total += $harga * $cart->jumlah;
+            }
         }
 
         return view('layouts.pages.cart', compact('carts', 'total'));

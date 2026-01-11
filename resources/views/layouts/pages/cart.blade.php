@@ -20,6 +20,7 @@
                     </div>
                     
                     @foreach($carts as $cart)
+                    @if($cart->product)
                     <div class="cart-item" data-cart-id="{{ $cart->id }}">
                         <div class="item-image">
                             <img src="{{ $cart->product->gambar ? asset('storage/' . $cart->product->gambar) : asset('images/product-placeholder.png') }}" 
@@ -29,7 +30,7 @@
                         
                         <div class="item-details">
                             <h3 class="item-name">{{ $cart->product->nama }}</h3>
-                            <p class="item-category">{{ $cart->product->category->nama }}</p>
+                            <p class="item-category">{{ $cart->product->category->nama ?? 'Uncategorized' }}</p>
                             <div class="item-price">
                                 @if($cart->product->harga_diskon)
                                     <span class="price-current">Rp{{ number_format($cart->product->harga_diskon, 0, ',', '.') }}</span>
@@ -60,6 +61,7 @@
                             </svg>
                         </button>
                     </div>
+                    @endif
                     @endforeach
                     
                     <div class="cart-actions">
